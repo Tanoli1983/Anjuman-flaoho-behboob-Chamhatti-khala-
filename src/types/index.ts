@@ -5,14 +5,28 @@ export type UserRole =
   | 'treasurer' 
   | 'secretary' 
   | 'office_bearer' 
-  | 'auditor';
+  | 'auditor'
+  | 'member';
+
+export type OfficeBearerRoleCategory = 
+  | 'executive' 
+  | 'finance' 
+  | 'area' 
+  | 'committee' 
+  | 'other';
 
 export interface OfficeBearer {
   id: string;
   name: string;
-  role: string;
+  role: string; // e.g. صدر (President), جنرل سیکرٹری (General Secretary), etc.
+  category?: OfficeBearerRoleCategory;
   phone: string;
+  address?: string;
   cnic?: string;
+  appointmentDate?: string;
+  status: 'active' | 'inactive';
+  avatar?: string;
+  notes?: string;
 }
 
 export interface OrganizationSettings {
@@ -23,15 +37,20 @@ export interface OrganizationSettings {
   phone: string;
   financialYear: string;
   monthlyFee: number; // default PKR 100
-  emergencyFee: number; // default PKR 100 per death
-  registrationFee: number; // default PKR 100
-  newMemberFirstMonthFee: number; // default PKR 100
+  emergencyFee: number; // default PKR 100 per death / month
+  registrationFee: number; // default PKR 200
+  newMemberFirstMonthFee: number; // default PKR 0 or 100
   currency: string; // "PKR"
   currencySymbol: string; // "Rs."
   officeBearers: OfficeBearer[];
   receiptPrefix: string; // e.g. "AFB-REC"
   lastBackupDate: string | null;
-  openingCashBalance: number;
+  openingCashBalance: number; // starts at 0
+  adminPin: string; // The configured password/PIN
+  adminPasswordConfigured?: boolean; // True once owner has set custom password
+  securityQuestion?: string; // Recovery question
+  securityAnswer?: string; // Recovery answer
+  recoverySecretKey?: string; // Emergency recovery key
 }
 
 export type MemberStatus = 'active' | 'inactive' | 'suspended' | 'deceased';
@@ -55,10 +74,11 @@ export type ObligationType = 'registration' | 'monthly' | 'emergency';
 export type ObligationStatus = 'unpaid' | 'partial' | 'paid' | 'waived';
 
 export interface FeeObligation {
-  id: string; // e.g. "OBL-REG-AFB-001", "OBL-MTH-2026-10-AFB-001", "OBL-EMG-EMG1-AFB-001"
+  id: string;
   memberId: string;
   type: ObligationType;
   periodMonth?: string; // YYYY-MM for monthly fees
+  periodYear?: string; // for annual emergency contributions
   emergencyEventId?: string; // for emergency fees
   title: string;
   amountDue: number;
@@ -74,9 +94,9 @@ export interface EmergencyEvent {
   deceasedRelation?: string;
   dateOfDeath: string; // YYYY-MM-DD
   description: string;
-  feePerMember: number; // PKR 100 or configured amount at time of event
+  feePerMember: number; // PKR 100
   eligibleMemberCount: number;
-  totalDue: number; // feePerMember * eligibleMemberCount
+  totalDue: number;
   totalCollected: number;
   relatedExpenseIds: string[];
   notes: string;
@@ -84,11 +104,13 @@ export interface EmergencyEvent {
 }
 
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'easypaisa' | 'jazzcash' | 'other';
+export type PaymentCategory = 'monthly' | 'emergency' | 'registration' | 'annual_emergency' | 'donation' | 'other';
 
 export interface PaymentAllocation {
-  obligationId: string;
-  type: ObligationType;
+  obligationId?: string;
+  type: ObligationType | 'donation' | 'other';
   periodMonth?: string;
+  periodYear?: string;
   emergencyEventId?: string;
   title: string;
   amount: number;
@@ -101,7 +123,9 @@ export interface PaymentRecord {
   memberName: string;
   date: string; // YYYY-MM-DD
   amountReceived: number;
+  paymentCategory: PaymentCategory;
   paymentMethod: PaymentMethod;
+  relevantPeriod?: string; // e.g. "2026-10" or "2026"
   notes: string;
   recordedBy: string;
   allocations: PaymentAllocation[];
@@ -109,12 +133,13 @@ export interface PaymentRecord {
   reversedAt?: string;
   reversalReason?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface IncomeRecord {
   id: string; // e.g. "INC-2026-001"
   date: string;
-  category: string; // e.g. "General Donation", "Zakat/Sadqah", "Welfare Grant", "Special Contribution"
+  category: string; // e.g. "General Donation", "Zakat/Sadqah", "Welfare Grant"
   description: string;
   amount: number;
   paymentMethod: PaymentMethod;
@@ -126,17 +151,20 @@ export interface IncomeRecord {
   reversedAt?: string;
   reversalReason?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface ExpenseRecord {
   id: string; // e.g. "EXP-2026-001"
+  title?: string;
   date: string;
-  category: string; // e.g. "Dar-ul-Baqa 2 cemetery", "Cemetery maintenance", "Construction and repair", "Funeral transport / ambulance", "Administrative expenses", "Emergency family relief", "Other welfare"
+  category: string; // e.g. "Dar-ul-Baqa 2 cemetery", "Cemetery maintenance", "Funeral transport", etc.
   description: string;
   amount: number;
   paymentMethod: PaymentMethod;
   paidTo: string;
   voucherNumber: string;
+  receiptAttachment?: string;
   notes: string;
   emergencyEventId?: string;
   createdBy: string;
@@ -145,6 +173,18 @@ export interface ExpenseRecord {
   status: 'valid' | 'reversed';
   reversedAt?: string;
   reversalReason?: string;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  titleUrdu?: string;
+  content: string;
+  date: string;
+  type: 'general' | 'death' | 'meeting' | 'emergency';
+  author: string;
+  pinned: boolean;
+  createdAt: string;
 }
 
 export interface AuditLog {
@@ -165,6 +205,7 @@ export interface AppState {
   payments: PaymentRecord[];
   incomes: IncomeRecord[];
   expenses: ExpenseRecord[];
+  announcements: Announcement[];
   auditLogs: AuditLog[];
 }
 
@@ -181,7 +222,7 @@ export interface MemberFinancialSummary {
   registrationBalance: number;
   totalPaid: number;
   totalDue: number;
-  totalBalance: number; // outstanding amount
+  totalBalance: number;
 }
 
 export interface AccountingSummary {

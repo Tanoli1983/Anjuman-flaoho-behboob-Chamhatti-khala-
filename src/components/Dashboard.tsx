@@ -16,59 +16,41 @@ import {
   CalendarCheck,
   Clock,
   Printer,
+  Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 
 export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }) => {
-  const { state, language, accountingSummary, setActiveTab, setLatestReceipt } = useApp();
+  const { state, language, isAdmin, accountingSummary, setActiveTab, setLatestReceipt, cleanAllFinancialRecords } = useApp();
   const t = translations[language];
 
   // Calculate new members this month
   const currentMonthStr = new Date().toISOString().substring(0, 7);
-  const newMembersThisMonthCount = state.members.filter(m => m.joiningMonth === currentMonthStr).length;
-
-  // Monthly fees stats
-  let totalMonthlyDue = 0;
-  let totalMonthlyCollected = 0;
-  for (const obl of state.obligations) {
-    if (obl.type === 'monthly') {
-      totalMonthlyDue += Math.round(obl.amountDue);
-      totalMonthlyCollected += Math.round(obl.amountPaid);
-    }
-  }
-
-  // Emergency fees stats
-  let totalEmergencyDue = 0;
-  let totalEmergencyCollected = 0;
-  for (const obl of state.obligations) {
-    if (obl.type === 'emergency') {
-      totalEmergencyDue += Math.round(obl.amountDue);
-      totalEmergencyCollected += Math.round(obl.amountPaid);
-    }
-  }
+  const newMembersThisMonthCount = (state.members || []).filter(m => m.joiningMonth === currentMonthStr).length;
 
   // Combine recent transactions (payments, expenses, incomes)
   const recentTransactions = [
-    ...state.payments.slice(0, 8).map(p => ({
+    ...(state.payments || []).slice(0, 8).map(p => ({
       id: p.id,
       type: 'payment' as const,
       title: `${p.memberName} (${p.receiptNumber})`,
-      subtitle: p.allocations.map(a => a.title).join(', '),
+      subtitle: `${p.paymentCategory.toUpperCase()} Fee • ${p.notes || 'Recorded in cash/bank'}`,
       amount: p.amountReceived,
       date: p.date,
       status: p.status,
       raw: p,
     })),
-    ...state.expenses.slice(0, 5).map(e => ({
+    ...(state.expenses || []).slice(0, 5).map(e => ({
       id: e.id,
       type: 'expense' as const,
-      title: `${e.category} - ${e.paidTo}`,
+      title: `${e.title || e.category} - ${e.paidTo}`,
       subtitle: e.description,
       amount: e.amount,
       date: e.date,
       status: e.status,
       raw: e,
     })),
-    ...state.incomes.slice(0, 5).map(i => ({
+    ...(state.incomes || []).slice(0, 5).map(i => ({
       id: i.id,
       type: 'income' as const,
       title: `${i.category} - ${i.receivedFrom}`,
@@ -80,6 +62,13 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 8);
 
+  const [showCleanConfirmModal, setShowCleanConfirmModal] = React.useState(false);
+
+  const handleExecuteCleanFinancials = () => {
+    cleanAllFinancialRecords();
+    setShowCleanConfirmModal(false);
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 pb-20 md:pb-6">
       {/* Top Banner & Title */}
@@ -88,26 +77,26 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
           <div>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-700/80 text-emerald-100 border border-emerald-500/30 mb-2">
               <ShieldCheck className="w-3.5 h-3.5" />
-              {state.settings.financialYear} • Chamhatti Khala Butt
+              {state.settings.financialYear} • Karachi & Haripur
             </span>
-            <h2 className="text-xl sm:text-2xl font-bold leading-tight">
-              {t.dashboard.title}
+            <h2 className="text-lg sm:text-2xl font-bold leading-tight">
+              {state.settings.orgName}
             </h2>
-            <p className="text-xs sm:text-sm text-emerald-100/90 mt-1">
-              {t.dashboard.subtitle}
+            <p className="text-xs sm:text-sm text-emerald-100/90 font-urdu mt-1">
+              {state.settings.orgNameUrdu}
             </p>
           </div>
 
           {/* Quick Cash Balance Display */}
           <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-white/20 flex flex-col items-start md:items-end">
             <span className="text-xs font-medium text-emerald-200">
-              {t.dashboard.cashBalance}
+              Total Available Balance (خالص کیش بیلنس)
             </span>
             <span className="text-2xl sm:text-3xl font-extrabold text-white mt-0.5 tracking-tight">
               {formatCurrency(accountingSummary.netCashBalance)}
             </span>
             <span className="text-[11px] text-emerald-200/80 mt-1">
-              {t.dashboard.openingBalance}: {formatCurrency(accountingSummary.openingBalance)}
+              Total Income: {formatCurrency(accountingSummary.totalIncomeCollected)} | Expenses: {formatCurrency(accountingSummary.totalExpenses)}
             </span>
           </div>
         </div>
@@ -116,12 +105,12 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
         <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/5 rounded-full blur-xl pointer-events-none" />
       </div>
 
-      {/* Main 4 KPI Financial Cards */}
+      {/* Main 4 Primary KPI Financial Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Cash Balance */}
+        {/* Available Cash Balance */}
         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold text-slate-600 truncate">{t.dashboard.cashBalance}</span>
+            <span className="text-xs font-semibold text-slate-600 truncate">Total Available Balance</span>
             <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700">
               <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
@@ -130,8 +119,8 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
             <div className="text-lg sm:text-2xl font-bold text-emerald-700">
               {formatCurrency(accountingSummary.netCashBalance)}
             </div>
-            <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-              <span>Net In-Hand / Bank</span>
+            <div className="text-[11px] text-slate-500 mt-1 truncate">
+              Income ({formatCurrency(accountingSummary.totalIncomeCollected)}) − Expenses ({formatCurrency(accountingSummary.totalExpenses)})
             </div>
           </div>
         </div>
@@ -149,7 +138,7 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
               {formatCurrency(accountingSummary.totalIncomeCollected)}
             </div>
             <div className="text-[11px] text-slate-500 mt-1 truncate">
-              Reg + Monthly + Emergency + Donations
+              Monthly + Emergency + Reg + Donations
             </div>
           </div>
         </div>
@@ -167,35 +156,35 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
               {formatCurrency(accountingSummary.totalExpenses)}
             </div>
             <div className="text-[11px] text-slate-500 mt-1 truncate">
-              Dar-ul-Baqa & Cemetery Care
+              Dar-ul-Baqa Cemetery & Welfare
             </div>
           </div>
         </div>
 
-        {/* Total Member Arrears */}
+        {/* Total Members */}
         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-semibold text-slate-600 truncate">{t.dashboard.totalArrears}</span>
-            <div className="p-2 rounded-lg bg-amber-100 text-amber-700">
-              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-xs font-semibold text-slate-600 truncate">{t.dashboard.totalMembers}</span>
+            <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
           <div>
-            <div className="text-lg sm:text-2xl font-bold text-amber-700">
-              {formatCurrency(accountingSummary.totalMemberArrears)}
+            <div className="text-lg sm:text-2xl font-bold text-slate-900">
+              {state.members.length} Members
             </div>
-            <div className="text-[11px] text-slate-500 mt-1 truncate">
-              Unpaid Member Obligations
+            <div className="text-[11px] text-emerald-600 font-semibold mt-1 truncate">
+              {accountingSummary.totalActiveMembers} Active • {newMembersThisMonthCount} this month
             </div>
           </div>
         </div>
       </div>
 
-      {/* Quick Operation Buttons (Mobile-first large touch targets) */}
+      {/* Quick Operation Buttons */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
         <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center justify-between">
           <span>{t.dashboard.quickActions}</span>
-          <span className="text-xs font-normal text-slate-500 font-urdu">فوری کارروائی</span>
+          <span className="text-xs font-normal text-slate-500 font-urdu">فوری کارروائیاں</span>
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
           <button
@@ -225,15 +214,15 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
           </button>
 
           <button
-            onClick={() => setActiveTab('emergency')}
+            onClick={() => setActiveTab('officeBearers')}
             className="flex items-center gap-2.5 p-3 rounded-xl bg-purple-50 text-purple-800 hover:bg-purple-100 active:scale-95 transition border border-purple-200/80 cursor-pointer font-semibold text-xs sm:text-sm"
           >
             <div className="p-2 rounded-lg bg-purple-700 text-white shrink-0">
-              <HeartHandshake className="w-4 h-4" />
+              <ShieldCheck className="w-4 h-4" />
             </div>
             <div className="text-left">
-              <div className="leading-tight">{t.emergency.recordDeathEvent}</div>
-              <div className="text-[10px] text-purple-600 font-urdu">کفن دفن فنڈ</div>
+              <div className="leading-tight">عہدیداران</div>
+              <div className="text-[10px] text-purple-600">Office-Bearers</div>
             </div>
           </button>
 
@@ -245,112 +234,148 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
               <TrendingDown className="w-4 h-4" />
             </div>
             <div className="text-left">
-              <div className="leading-tight">{t.expenses.addExpense}</div>
-              <div className="text-[10px] text-rose-600 font-urdu">نیا خرچہ</div>
+              <div className="leading-tight">نیا خرچہ</div>
+              <div className="text-[10px] text-rose-600">Expense</div>
             </div>
           </button>
         </div>
       </div>
 
-      {/* Secondary Metric Stats: Members, Monthly, Emergency, Registration */}
+      {/* Secondary Detailed Fee Category Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Members Status */}
+        {/* Monthly Fees Received */}
         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold text-slate-600">{t.dashboard.totalMembers}</span>
-            <Users className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="text-xl font-bold text-slate-800">
-            {state.members.length}
-          </div>
-          <div className="text-xs text-slate-500 mt-1 flex items-center justify-between">
-            <span className="text-emerald-600 font-medium">{accountingSummary.totalActiveMembers} Active</span>
-            <span className="text-slate-400">|</span>
-            <span className="text-slate-500">{newMembersThisMonthCount} this month</span>
-          </div>
-        </div>
-
-        {/* Monthly Fees Collected */}
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold text-slate-600 truncate">{t.dashboard.monthlyFeesCollected}</span>
+            <span className="text-xs font-semibold text-slate-600 truncate">Monthly Fees Received</span>
             <CalendarCheck className="w-4 h-4 text-blue-600" />
           </div>
           <div className="text-xl font-bold text-slate-800">
-            {formatCurrency(totalMonthlyCollected)}
+            {formatCurrency(accountingSummary.totalMonthlyFees)}
           </div>
-          <div className="text-xs text-slate-500 mt-1 flex items-center justify-between">
-            <span>Due: {formatCurrency(totalMonthlyDue)}</span>
-            <span className="text-amber-600 font-medium">Bal: {formatCurrency(totalMonthlyDue - totalMonthlyCollected)}</span>
+          <div className="text-xs text-slate-500 mt-1">
+            Rs. {state.settings.monthlyFee || 100} / member / month
           </div>
         </div>
 
-        {/* Emergency Fees Collected */}
+        {/* Emergency Fees Received */}
         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold text-slate-600 truncate">{t.dashboard.emergencyCollected}</span>
+            <span className="text-xs font-semibold text-slate-600 truncate">Emergency Fees Received</span>
             <HeartHandshake className="w-4 h-4 text-purple-600" />
           </div>
           <div className="text-xl font-bold text-slate-800">
-            {formatCurrency(totalEmergencyCollected)}
+            {formatCurrency(accountingSummary.totalEmergencyFees)}
           </div>
-          <div className="text-xs text-slate-500 mt-1 flex items-center justify-between">
-            <span>Due: {formatCurrency(totalEmergencyDue)}</span>
-            <span className="text-purple-600 font-medium">{state.emergencyEvents.length} Events</span>
+          <div className="text-xs text-slate-500 mt-1">
+            Rs. {state.settings.emergencyFee || 100} / death fund
           </div>
         </div>
 
-        {/* Registration Fees & Donations */}
+        {/* Registration Fees Received */}
         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold text-slate-600 truncate">{t.dashboard.registrationFees}</span>
+            <span className="text-xs font-semibold text-slate-600 truncate">Registration Fees Received</span>
             <ReceiptText className="w-4 h-4 text-teal-600" />
           </div>
           <div className="text-xl font-bold text-slate-800">
             {formatCurrency(accountingSummary.totalRegistrationFees)}
           </div>
-          <div className="text-xs text-slate-500 mt-1 flex items-center justify-between">
-            <span>Other: {formatCurrency(accountingSummary.totalDonationsAndOtherIncome)}</span>
-            <span className="text-emerald-600 font-medium">PKR 100/reg</span>
+          <div className="text-xs text-slate-500 mt-1">
+            Rs. {state.settings.registrationFee || 200} / new member
+          </div>
+        </div>
+
+        {/* Donations & Other Income */}
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
+            <span className="text-xs font-semibold text-slate-600 truncate">Donations & Other Income</span>
+            <Sparkles className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="text-xl font-bold text-slate-800">
+            {formatCurrency(accountingSummary.totalDonationsAndOtherIncome)}
+          </div>
+          <div className="text-xs text-slate-500 mt-1">
+            General community contributions
           </div>
         </div>
       </div>
 
-      {/* Accounting Verification Test Callout Banner */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-start sm:items-center gap-3">
-          <div className="p-2 rounded-lg bg-amber-500 text-slate-900 shrink-0">
-            <ShieldCheck className="w-5 h-5" />
+      {/* Clean Slate Confirmation / Reset Button for Admin */}
+      {isAdmin && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <RotateCcw className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+            <div>
+              <span className="text-xs sm:text-sm font-bold text-amber-950 block">
+                Reset All Financial Transactions to Zero
+              </span>
+              <span className="text-xs text-amber-800">
+                Wipes all unverified payments, expenses, and donations while preserving all registered members and office-bearers.
+              </span>
+            </div>
           </div>
-          <div>
-            <h4 className="text-xs sm:text-sm font-bold text-amber-950">
-              Audit & Accounting Verification Suite (Tests A to K)
-            </h4>
-            <p className="text-xs text-amber-800 mt-0.5">
-              Verify exact PKR 79,700 expense math, PKR 200 new member rule, duplicate prevention, and zero arithmetic errors.
-            </p>
+          <button
+            onClick={() => setShowCleanConfirmModal(true)}
+            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shrink-0 cursor-pointer"
+          >
+            Reset Financials to Zero
+          </button>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Resetting Financial Transactions */}
+      {showCleanConfirmModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-full bg-amber-100 text-amber-700 shrink-0">
+                <RotateCcw className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Reset All Financial Records to Zero?
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                  This will permanently wipe all payment entries, expenses, donations, and fee obligations, returning all totals to Rs. 0.
+                </p>
+                <div className="mt-2.5 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
+                  <span className="font-bold">Preserved:</span> All registered members ({state.members.length}), office-bearers, and settings will remain completely intact.
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowCleanConfirmModal(false)}
+                className="px-4 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteCleanFinancials}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs cursor-pointer"
+              >
+                Yes, Reset to Zero
+              </button>
+            </div>
           </div>
         </div>
-        <button
-          onClick={onOpenTests}
-          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold rounded-lg text-xs transition shrink-0 cursor-pointer text-center"
-        >
-          {t.tests.runAll}
-        </button>
-      </div>
+      )}
 
-      {/* Recent Transactions & Activity */}
+      {/* Recent Transactions Feed */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
             <Clock className="w-4 h-4 text-emerald-600" />
-            <span>{t.dashboard.recentTransactions}</span>
+            <span>Recent Verified Transactions</span>
           </h3>
           <button
             onClick={() => setActiveTab('reports')}
             className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer"
           >
-            View Full Ledger →
+            View Master Ledger →
           </button>
         </div>
 
@@ -376,11 +401,6 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
                   <span className="text-xs sm:text-sm font-bold text-slate-800 truncate">
                     {tx.title}
                   </span>
-                  {tx.status === 'reversed' && (
-                    <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.2 rounded">
-                      Reversed
-                    </span>
-                  )}
                 </div>
                 <p className="text-xs text-slate-500 truncate mt-0.5">
                   {tx.subtitle} • {formatDate(tx.date)}
@@ -408,12 +428,13 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
               </div>
             </div>
           ))}
-        </div>
-      </div>
 
-      {/* Backup Footer Status */}
-      <div className="text-center text-xs text-slate-400 py-2">
-        <span>{t.dashboard.lastBackup}: {state.settings.lastBackupDate || t.dashboard.noBackupYet}</span>
+          {recentTransactions.length === 0 && (
+            <div className="text-center py-10 text-slate-400 text-xs sm:text-sm">
+              All financial entries currently show zero. Administrator can enter fresh payments and expenses using the buttons above.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

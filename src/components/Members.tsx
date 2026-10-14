@@ -2,13 +2,14 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { translations } from '../i18n/translations';
 import { formatCurrency, formatDate } from '../utils/formatters';
-import { Member, MemberStatus, PaymentMethod } from '../types';
+import { Member, MemberStatus } from '../types';
 import {
   UserPlus,
   Search,
   BookOpen,
   ReceiptText,
   Edit2,
+  Trash2,
   FileSpreadsheet,
   Printer,
   X,
@@ -17,6 +18,7 @@ import {
   Calendar,
   AlertCircle,
   Archive,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface MembersProps {
@@ -28,7 +30,7 @@ export const Members: React.FC<MembersProps> = ({
   onSelectMemberForLedger,
   onSelectMemberForPayment,
 }) => {
-  const { state, language, addMember, updateMember, archiveMember, getMemberSummary } = useApp();
+  const { state, language, isAdmin, addMember, updateMember, deleteMember, getMemberSummary } = useApp();
   const t = translations[language];
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,6 +38,7 @@ export const Members: React.FC<MembersProps> = ({
   const [balanceFilter, setBalanceFilter] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
 
   // Form State for Add Member
   const [newMemberName, setNewMemberName] = useState('');
@@ -46,14 +49,10 @@ export const Members: React.FC<MembersProps> = ({
     new Date().toISOString().substring(0, 10)
   );
   const [newMemberNotes, setNewMemberNotes] = useState('');
-  const [collectInitialNow, setCollectInitialNow] = useState(true);
-  const [initialPaymentAmount, setInitialPaymentAmount] = useState<number>(200);
-  const [initialPaymentMethod, setInitialPaymentMethod] = useState<PaymentMethod>('cash');
 
   // Filtered members list
   const filteredMembers = useMemo(() => {
-    return state.members.filter((member) => {
-      // Search text match
+    return (state.members || []).filter((member) => {
       const query = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !query ||
@@ -62,10 +61,8 @@ export const Members: React.FC<MembersProps> = ({
         member.id.toLowerCase().includes(query) ||
         member.mobile.includes(query);
 
-      // Status match
       const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
 
-      // Balance match
       const summary = getMemberSummary(member.id);
       const hasBalance = summary ? summary.totalBalance > 0 : false;
       const matchesBalance =
@@ -88,11 +85,8 @@ export const Members: React.FC<MembersProps> = ({
       address: newMemberAddress,
       joiningDate: newMemberJoiningDate,
       notes: newMemberNotes,
-      initialPaymentReceived: collectInitialNow ? initialPaymentAmount : 0,
-      paymentMethod: initialPaymentMethod,
     });
 
-    // Reset Form
     setNewMemberName('');
     setNewMemberFatherName('');
     setNewMemberMobile('');
@@ -117,6 +111,11 @@ export const Members: React.FC<MembersProps> = ({
     setEditingMember(null);
   };
 
+  const handleDeleteMember = (id: string) => {
+    deleteMember(id);
+    setDeletingMemberId(null);
+  };
+
   const handleExportCsv = () => {
     const headers = [
       'Member ID',
@@ -126,11 +125,6 @@ export const Members: React.FC<MembersProps> = ({
       'Address',
       'Joining Date',
       'Status',
-      'Monthly Due',
-      'Monthly Paid',
-      'Emergency Due',
-      'Emergency Paid',
-      'Registration Paid',
       'Total Paid',
       'Total Balance',
     ];
@@ -145,11 +139,6 @@ export const Members: React.FC<MembersProps> = ({
         `"${m.address}"`,
         `"${m.joiningDate}"`,
         `"${m.status}"`,
-        s?.monthlyDue || 0,
-        s?.monthlyPaid || 0,
-        s?.emergencyDue || 0,
-        s?.emergencyPaid || 0,
-        s?.registrationPaid || 0,
         s?.totalPaid || 0,
         s?.totalBalance || 0,
       ].join(',');
@@ -159,7 +148,7 @@ export const Members: React.FC<MembersProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `AFB_Chamhatti_Members_${new Date().toISOString().substring(0, 10)}.csv`);
+    link.setAttribute('download', `AFB_Karachi_Members_${new Date().toISOString().substring(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -174,7 +163,7 @@ export const Members: React.FC<MembersProps> = ({
             {t.members.title}
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            {t.members.subtitle} ({state.members.length} Total Members)
+            {t.members.subtitle} ({state.members.length} Registered Members)
           </p>
         </div>
 
@@ -193,13 +182,15 @@ export const Members: React.FC<MembersProps> = ({
             <Printer className="w-4 h-4 text-slate-600" />
             <span className="hidden sm:inline">Print</span>
           </button>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md cursor-pointer transition"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>{t.members.addNewMember}</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md cursor-pointer transition"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>{t.members.addNewMember}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -244,7 +235,7 @@ export const Members: React.FC<MembersProps> = ({
         </div>
       </div>
 
-      {/* Member Cards Grid (Mobile) and Table (Desktop) */}
+      {/* Member Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {filteredMembers.map((member) => {
           const summary = getMemberSummary(member.id);
@@ -308,22 +299,16 @@ export const Members: React.FC<MembersProps> = ({
                 {summary && (
                   <div className="mt-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200/80 text-xs">
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-slate-500">Monthly Fees:</span>
-                      <span className="font-medium">
-                        Paid {formatCurrency(summary.monthlyPaid)} / Due {formatCurrency(summary.monthlyDue)}
+                      <span className="text-slate-500">Total Paid:</span>
+                      <span className="font-bold text-emerald-700">
+                        {formatCurrency(summary.totalPaid)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-slate-500">Emergency Fund:</span>
-                      <span className="font-medium">
-                        Paid {formatCurrency(summary.emergencyPaid)} / Due {formatCurrency(summary.emergencyDue)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center pt-1.5 border-t border-slate-200">
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-200">
                       <span className="font-semibold text-slate-700">Balance Due:</span>
                       <span
                         className={`font-bold text-sm ${
-                          summary.totalBalance > 0 ? 'text-amber-700' : 'text-emerald-700'
+                          summary.totalBalance > 0 ? 'text-amber-700' : 'text-slate-800'
                         }`}
                       >
                         {formatCurrency(summary.totalBalance)}
@@ -337,25 +322,36 @@ export const Members: React.FC<MembersProps> = ({
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-1.5">
                 <button
                   onClick={() => onSelectMemberForPayment(member.id)}
-                  className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
                 >
                   <ReceiptText className="w-3.5 h-3.5" />
-                  <span>Collect</span>
+                  <span>Fee</span>
                 </button>
                 <button
                   onClick={() => onSelectMemberForLedger(member.id)}
-                  className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
                 >
                   <BookOpen className="w-3.5 h-3.5 text-slate-500" />
                   <span>Ledger</span>
                 </button>
-                <button
-                  onClick={() => setEditingMember(member)}
-                  title="Edit Member"
-                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                </button>
+                {isAdmin && (
+                  <>
+                    <button
+                      onClick={() => setEditingMember(member)}
+                      title="Edit Member"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDeletingMemberId(member.id)}
+                      title="Delete Member"
+                      className="p-1.5 text-rose-400 hover:text-rose-700 rounded-lg hover:bg-rose-50 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           );
@@ -364,11 +360,11 @@ export const Members: React.FC<MembersProps> = ({
 
       {filteredMembers.length === 0 && (
         <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-500 text-sm">
-          {t.members.noMembers}
+          No members found matching your search.
         </div>
       )}
 
-      {/* Register New Member Modal (Enforces Test A: 100 Reg + 100 Month 1 = 200 Total) */}
+      {/* Register New Member Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl p-5 sm:p-6 animate-in zoom-in-95 duration-150">
@@ -378,7 +374,7 @@ export const Members: React.FC<MembersProps> = ({
                   {t.members.addNewMember}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  New member registration with automatic fee obligation generation
+                  New member registration (Registration Fee: Rs. 200, Monthly Fee: Rs. 100)
                 </p>
               </div>
               <button
@@ -390,18 +386,11 @@ export const Members: React.FC<MembersProps> = ({
             </div>
 
             <form onSubmit={handleCreateMember} className="space-y-4 mt-4 text-xs sm:text-sm">
-              {/* Critical Rule Callout: PKR 100 Reg + PKR 100 1st Month = PKR 200 Due */}
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-emerald-900 text-xs">
-                <AlertCircle className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-bold">Initial Registration Requirement (Test A):</div>
-                  <div>
-                    Registration Fee: PKR {state.settings.registrationFee || 100} • First Month Fee: PKR {state.settings.newMemberFirstMonthFee || 100}
-                  </div>
-                  <div className="font-semibold text-emerald-950 mt-0.5">
-                    Total Initial Amount Due = PKR {(state.settings.registrationFee || 100) + (state.settings.newMemberFirstMonthFee || 100)}
-                  </div>
-                </div>
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-950 text-xs">
+                <span className="font-bold block">Association Fee Rules:</span>
+                <span>
+                  New Member Registration Fee: Rs. {state.settings.registrationFee || 200} • Monthly Membership Fee: Rs. {state.settings.monthlyFee || 100} per month.
+                </span>
               </div>
 
               <div>
@@ -461,59 +450,28 @@ export const Members: React.FC<MembersProps> = ({
 
               <div>
                 <label className="block text-slate-700 font-semibold mb-1">
-                  Address / پتہ
+                  Address (Karachi / Haripur)
                 </label>
                 <input
                   type="text"
-                  placeholder="Mohallah / Sector in Chamhatti Khala Butt"
+                  placeholder="Area / Sector in Karachi or Chamhatti"
                   value={newMemberAddress}
                   onChange={(e) => setNewMemberAddress(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
-              {/* Instant Fee Collection Option */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={collectInitialNow}
-                    onChange={(e) => setCollectInitialNow(e.target.checked)}
-                    className="w-4 h-4 text-emerald-600 rounded"
-                  />
-                  <span className="font-semibold text-slate-800 text-xs sm:text-sm">
-                    Collect Initial Fee Now & Generate Receipt
-                  </span>
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Notes
                 </label>
-
-                {collectInitialNow && (
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 text-xs">
-                    <div>
-                      <label className="block text-slate-600 mb-1">Amount Received (PKR)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="200"
-                        value={initialPaymentAmount}
-                        onChange={(e) => setInitialPaymentAmount(parseInt(e.target.value, 10) || 0)}
-                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-md font-bold text-slate-800"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-600 mb-1">Payment Method</label>
-                      <select
-                        value={initialPaymentMethod}
-                        onChange={(e) => setInitialPaymentMethod(e.target.value as PaymentMethod)}
-                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded-md"
-                      >
-                        <option value="cash">Cash (نقد)</option>
-                        <option value="easypaisa">Easypaisa</option>
-                        <option value="jazzcash">JazzCash</option>
-                        <option value="bank_transfer">Bank Transfer</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
+                <input
+                  type="text"
+                  placeholder="Optional reference or notes"
+                  value={newMemberNotes}
+                  onChange={(e) => setNewMemberNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                />
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
@@ -542,7 +500,7 @@ export const Members: React.FC<MembersProps> = ({
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl p-5 sm:p-6 animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-slate-900 text-base sm:text-lg">
-                {t.members.editMember} ({editingMember.id})
+                Edit Member Details ({editingMember.id})
               </h3>
               <button
                 onClick={() => setEditingMember(null)}
@@ -620,35 +578,49 @@ export const Members: React.FC<MembersProps> = ({
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => {
-                    archiveMember(editingMember.id, 'Administrator requested inactive status');
-                    setEditingMember(null);
-                  }}
-                  className="flex items-center gap-1 text-rose-700 hover:text-rose-800 text-xs font-semibold cursor-pointer"
+                  onClick={() => setEditingMember(null)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-semibold"
                 >
-                  <Archive className="w-4 h-4" />
-                  <span>Archive Member</span>
+                  {t.common.cancel}
                 </button>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingMember(null)}
-                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-semibold"
-                  >
-                    {t.common.cancel}
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold"
-                  >
-                    {t.common.save}
-                  </button>
-                </div>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold"
+                >
+                  {t.common.save}
+                </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Member Confirmation Modal */}
+      {deletingMemberId && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl animate-in zoom-in-95">
+            <h3 className="font-bold text-slate-900 text-base">Confirm Member Deletion</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Are you sure you want to delete this member ({deletingMemberId})? This will permanently remove duplicate or incorrectly registered member records.
+            </p>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setDeletingMemberId(null)}
+                className="px-3 py-1.5 bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteMember(deletingMemberId)}
+                className="px-4 py-1.5 bg-rose-700 text-white rounded-lg text-xs font-bold shadow-xs"
+              >
+                Yes, Delete Member
+              </button>
+            </div>
           </div>
         </div>
       )}

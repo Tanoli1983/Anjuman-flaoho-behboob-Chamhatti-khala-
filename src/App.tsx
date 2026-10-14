@@ -18,21 +18,28 @@ import { MemberLedger } from './components/MemberLedger';
 import { Reports } from './components/Reports';
 import { BackupRestore } from './components/BackupRestore';
 import { Settings } from './components/Settings';
+import { OfficeBearers } from './components/OfficeBearers';
+import { Announcements } from './components/Announcements';
 import { ReceiptModal } from './components/ReceiptModal';
 import { AccountingTestsModal } from './components/AccountingTestsModal';
+import { AdminLoginModal } from './components/AdminLoginModal';
 
 const MainLayout: React.FC = () => {
   const { activeTab, setActiveTab, latestReceipt, setLatestReceipt, language } = useApp();
   const [selectedLedgerMemberId, setSelectedLedgerMemberId] = useState<string>('');
   const [selectedPaymentMemberId, setSelectedPaymentMemberId] = useState<string>('');
   const [isTestsModalOpen, setIsTestsModalOpen] = useState(false);
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
 
   const isUrduRtl = language === 'ur';
 
   return (
     <div className={`min-h-screen bg-slate-100 flex flex-col font-sans ${isUrduRtl ? 'font-urdu' : ''}`}>
       {/* Top Header */}
-      <Header onOpenTests={() => setIsTestsModalOpen(true)} />
+      <Header 
+        onOpenTests={() => setIsTestsModalOpen(true)} 
+        onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
+      />
 
       {/* Navigation Bar (Desktop & Mobile Drawer) */}
       <Navigation />
@@ -104,6 +111,10 @@ const MainLayout: React.FC = () => {
           />
         )}
 
+        {activeTab === 'officeBearers' && <OfficeBearers />}
+
+        {activeTab === 'announcements' && <Announcements />}
+
         {activeTab === 'backup' && <BackupRestore />}
 
         {activeTab === 'settings' && <Settings />}
@@ -119,6 +130,12 @@ const MainLayout: React.FC = () => {
       <AccountingTestsModal
         isOpen={isTestsModalOpen}
         onClose={() => setIsTestsModalOpen(false)}
+      />
+
+      {/* Admin Authentication & PIN Management Modal */}
+      <AdminLoginModal
+        isOpen={isAdminLoginOpen}
+        onClose={() => setIsAdminLoginOpen(false)}
       />
     </div>
   );

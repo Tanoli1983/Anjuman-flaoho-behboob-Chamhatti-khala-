@@ -10,22 +10,23 @@ import {
   FileSpreadsheet,
   Printer,
   X,
-  RotateCcw,
-  AlertCircle,
+  Edit2,
+  Trash2,
   CheckCircle2,
 } from 'lucide-react';
 
 export const ExpenseManagement: React.FC = () => {
-  const { state, language, addExpense, reverseExpense } = useApp();
+  const { state, language, isAdmin, addExpense, updateExpense, deleteExpense } = useApp();
   const t = translations[language];
 
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [reversingExpense, setReversingExpense] = useState<ExpenseRecord | null>(null);
-  const [reversalReason, setReversalReason] = useState('');
+  const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null);
+  const [deletingExpenseId, setDeletingExpenseId] = useState<string | null>(null);
 
   // Form State
+  const [title, setTitle] = useState('');
   const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
   const [category, setCategory] = useState('Dar-ul-Baqa 2 cemetery');
   const [description, setDescription] = useState('');
@@ -33,6 +34,7 @@ export const ExpenseManagement: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [paidTo, setPaidTo] = useState('');
   const [voucherNumber, setVoucherNumber] = useState('');
+  const [receiptAttachment, setReceiptAttachment] = useState('');
   const [notes, setNotes] = useState('');
 
   const categories = [
@@ -42,12 +44,13 @@ export const ExpenseManagement: React.FC = () => {
     'Funeral transport / ambulance',
     'Administrative expenses',
     'Emergency family relief',
+    'Karachi office expenses',
     'Other welfare',
   ];
 
-  // Authoritative total calculated dynamically from stored records (Enforce Test D)
+  // Authoritative total calculated dynamically from stored records
   const validExpenses = useMemo(() => {
-    return state.expenses.filter((e) => e.status !== 'reversed');
+    return (state.expenses || []).filter((e) => e.status !== 'reversed');
   }, [state.expenses]);
 
   const totalValidExpensesSum = useMemo(() => {
@@ -56,10 +59,11 @@ export const ExpenseManagement: React.FC = () => {
 
   // Filtered expenses list
   const filteredExpenses = useMemo(() => {
-    return state.expenses.filter((e) => {
+    return (state.expenses || []).filter((e) => {
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
+        (e.title && e.title.toLowerCase().includes(q)) ||
         e.description.toLowerCase().includes(q) ||
         e.paidTo.toLowerCase().includes(q) ||
         e.voucherNumber.toLowerCase().includes(q) ||
@@ -76,6 +80,7 @@ export const ExpenseManagement: React.FC = () => {
     if (!description.trim() || amount <= 0) return;
 
     addExpense({
+      title: title.trim() || description.trim(),
       date,
       category,
       description,
@@ -83,45 +88,64 @@ export const ExpenseManagement: React.FC = () => {
       paymentMethod,
       paidTo,
       voucherNumber: voucherNumber || `VOUCH-${Date.now().toString().slice(-4)}`,
+      receiptAttachment,
       notes,
     });
 
     // Reset Form
+    setTitle('');
     setDescription('');
     setAmount(1000);
     setPaidTo('');
     setVoucherNumber('');
+    setReceiptAttachment('');
     setNotes('');
     setIsAddModalOpen(false);
   };
 
-  const handleConfirmReversal = (e: React.FormEvent) => {
+  const handleUpdateExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reversingExpense || !reversalReason.trim()) return;
+    if (!editingExpense) return;
 
-    reverseExpense(reversingExpense.id, reversalReason.trim());
-    setReversingExpense(null);
-    setReversalReason('');
+    updateExpense(editingExpense.id, {
+      title: editingExpense.title,
+      date: editingExpense.date,
+      category: editingExpense.category,
+      description: editingExpense.description,
+      amount: Math.round(editingExpense.amount),
+      paymentMethod: editingExpense.paymentMethod,
+      paidTo: editingExpense.paidTo,
+      voucherNumber: editingExpense.voucherNumber,
+      receiptAttachment: editingExpense.receiptAttachment,
+      notes: editingExpense.notes,
+    });
+
+    setEditingExpense(null);
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    deleteExpense(id);
+    setDeletingExpenseId(null);
   };
 
   const handleExportCsv = () => {
-    const headers = ['Expense ID', 'Date', 'Category', 'Description', 'Amount (PKR)', 'Paid To', 'Voucher #', 'Status'];
+    const headers = ['Expense ID', 'Title', 'Date', 'Category', 'Description', 'Amount (PKR)', 'Paid To', 'Voucher #'];
     const rows = state.expenses.map((e) => [
       `"${e.id}"`,
+      `"${e.title || e.description}"`,
       `"${e.date}"`,
       `"${e.category}"`,
       `"${e.description}"`,
       e.amount,
       `"${e.paidTo}"`,
       `"${e.voucherNumber}"`,
-      `"${e.status}"`,
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
     const encoded = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encoded);
-    link.setAttribute('download', `AFB_Expenses_${new Date().toISOString().substring(0, 10)}.csv`);
+    link.setAttribute('download', `AFB_Karachi_Expenses_${new Date().toISOString().substring(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -133,10 +157,10 @@ export const ExpenseManagement: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">
-            {t.expenses.title}
+            اخراجات کا مکمل انتظام (Expense Management)
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            {t.expenses.subtitle}
+            Add, edit, and delete association expenditures with authoritative database totals
           </p>
         </div>
 
@@ -155,17 +179,19 @@ export const ExpenseManagement: React.FC = () => {
             <Printer className="w-4 h-4 text-slate-600" />
             <span className="hidden sm:inline">Print</span>
           </button>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-rose-700 hover:bg-rose-800 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md cursor-pointer transition"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>{t.expenses.addExpense}</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-rose-700 hover:bg-rose-800 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md cursor-pointer transition"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Record Expense</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Critical Accounting Banner (Test D: 28,500 + 31,200 + 20,000 = 79,700) */}
+      {/* Authoritative Expense Total Card */}
       <div className="bg-white rounded-xl border border-rose-200 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-rose-100 text-rose-700 rounded-xl shrink-0">
@@ -173,7 +199,7 @@ export const ExpenseManagement: React.FC = () => {
           </div>
           <div>
             <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider block">
-              Authoritative Total Valid Expenses (کل خرچہ)
+              Total Valid Expenses (کل خرچہ)
             </span>
             <div className="text-2xl sm:text-3xl font-black text-rose-700">
               {formatCurrency(totalValidExpensesSum)}
@@ -184,7 +210,7 @@ export const ExpenseManagement: React.FC = () => {
         <div className="bg-rose-50/70 p-3 rounded-lg border border-rose-100 text-xs text-rose-950 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-rose-600 shrink-0" />
           <span>
-            Strict integer arithmetic active: Recalculates dynamically directly from verified vouchers.
+            Calculated dynamically from saved database transactions: e.g. Rs. 28,500 + Rs. 31,200 + Rs. 20,000 = Rs. 79,700.
           </span>
         </div>
       </div>
@@ -224,25 +250,25 @@ export const ExpenseManagement: React.FC = () => {
               <tr>
                 <th className="py-2.5 px-3 sm:px-4">Date</th>
                 <th className="py-2.5 px-3 sm:px-4">Category</th>
-                <th className="py-2.5 px-3 sm:px-4">Description / Particulars</th>
+                <th className="py-2.5 px-3 sm:px-4">Description / Title</th>
                 <th className="py-2.5 px-3 sm:px-4">Paid To</th>
                 <th className="py-2.5 px-3 sm:px-4">Voucher #</th>
                 <th className="py-2.5 px-3 sm:px-4 text-right">Amount (PKR)</th>
-                <th className="py-2.5 px-3 sm:px-4 text-center">Status</th>
-                <th className="py-2.5 px-3 sm:px-4 text-center no-print">Action</th>
+                {isAdmin && <th className="py-2.5 px-3 sm:px-4 text-center no-print">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredExpenses.map((exp) => (
-                <tr key={exp.id} className={`hover:bg-slate-50 transition ${exp.status === 'reversed' ? 'opacity-50 line-through bg-slate-50' : ''}`}>
+                <tr key={exp.id} className="hover:bg-slate-50 transition">
                   <td className="py-2.5 px-3 sm:px-4 whitespace-nowrap font-mono text-slate-600">
                     {formatDate(exp.date)}
                   </td>
                   <td className="py-2.5 px-3 sm:px-4 font-semibold text-slate-800 whitespace-nowrap">
                     {exp.category}
                   </td>
-                  <td className="py-2.5 px-3 sm:px-4 text-slate-700 max-w-xs truncate">
-                    {exp.description}
+                  <td className="py-2.5 px-3 sm:px-4 text-slate-700 max-w-xs">
+                    <span className="font-semibold block text-slate-900">{exp.title || exp.description}</span>
+                    <span className="text-xs text-slate-500">{exp.description}</span>
                   </td>
                   <td className="py-2.5 px-3 sm:px-4 font-medium text-slate-900 whitespace-nowrap">
                     {exp.paidTo}
@@ -253,26 +279,26 @@ export const ExpenseManagement: React.FC = () => {
                   <td className="py-2.5 px-3 sm:px-4 text-right font-extrabold text-rose-700 whitespace-nowrap">
                     {formatCurrency(exp.amount)}
                   </td>
-                  <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                        exp.status === 'reversed' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'
-                      }`}
-                    >
-                      {exp.status}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 sm:px-4 text-center no-print">
-                    {exp.status !== 'reversed' && (
-                      <button
-                        onClick={() => setReversingExpense(exp)}
-                        title="Auditable Reversal"
-                        className="p-1 text-slate-400 hover:text-red-700 rounded hover:bg-red-50 cursor-pointer"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </td>
+                  {isAdmin && (
+                    <td className="py-2.5 px-3 sm:px-4 text-center no-print">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => setEditingExpense(exp)}
+                          title="Edit Expense"
+                          className="p-1 text-slate-500 hover:text-slate-800 rounded hover:bg-slate-100"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingExpenseId(exp.id)}
+                          title="Delete Expense"
+                          className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -284,11 +310,17 @@ export const ExpenseManagement: React.FC = () => {
                 <td className="py-3 px-3 sm:px-4 text-right text-rose-700 text-base">
                   {formatCurrency(totalValidExpensesSum)}
                 </td>
-                <td colSpan={2}></td>
+                {isAdmin && <td></td>}
               </tr>
             </tfoot>
           </table>
         </div>
+
+        {filteredExpenses.length === 0 && (
+          <div className="text-center py-10 text-slate-400 text-xs sm:text-sm">
+            No expenses recorded yet. All old sample expenses were removed as requested.
+          </div>
+        )}
       </div>
 
       {/* Add Expense Modal */}
@@ -297,7 +329,7 @@ export const ExpenseManagement: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl p-5 sm:p-6 animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-slate-900 text-base sm:text-lg">
-                {t.expenses.addExpense}
+                Record New Expense / نیا خرچہ
               </h3>
               <button
                 onClick={() => setIsAddModalOpen(false)}
@@ -308,6 +340,20 @@ export const ExpenseManagement: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateExpense} className="space-y-3.5 mt-4 text-xs sm:text-sm">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Expense Title / عنوان *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Dar-ul-Baqa Cemetery Main Gate Repair"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 font-semibold"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Date *</label>
@@ -337,12 +383,12 @@ export const ExpenseManagement: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Description / تفصیل *
+                  Description / تفصیلی بیان *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Dar-ul-Baqa cemetery water tank repair & pipes"
+                  placeholder="e.g. Mistri charges and materials purchased"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
@@ -352,7 +398,7 @@ export const ExpenseManagement: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Amount (PKR) *
+                    Amount (PKR / روپے) *
                   </label>
                   <input
                     type="number"
@@ -368,7 +414,7 @@ export const ExpenseManagement: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="Vendor, mistri, driver name"
+                    placeholder="Vendor / Payee Name"
                     value={paidTo}
                     onChange={(e) => setPaidTo(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -381,7 +427,7 @@ export const ExpenseManagement: React.FC = () => {
                   <label className="block font-semibold text-slate-700 mb-1">Voucher #</label>
                   <input
                     type="text"
-                    placeholder="e.g. VOUCH-2026-04"
+                    placeholder="e.g. VOUCH-01"
                     value={voucherNumber}
                     onChange={(e) => setVoucherNumber(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg"
@@ -403,12 +449,14 @@ export const ExpenseManagement: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Notes</label>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Receipt / Supporting Document Ref
+                </label>
                 <input
                   type="text"
-                  placeholder="Meeting approval or receipt remarks"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Receipt number or invoice reference"
+                  value={receiptAttachment}
+                  onChange={(e) => setReceiptAttachment(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                 />
               </div>
@@ -425,7 +473,7 @@ export const ExpenseManagement: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-bold shadow-md"
                 >
-                  Record Expense
+                  Save Expense
                 </button>
               </div>
             </form>
@@ -433,48 +481,122 @@ export const ExpenseManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Auditable Reversal Modal */}
-      {reversingExpense && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl p-5 animate-in zoom-in-95">
-            <h3 className="font-bold text-slate-900 text-base">
-              Reverse Expense Voucher ({reversingExpense.voucherNumber})
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Reversing will auditably remove PKR {formatCurrency(reversingExpense.amount)} from valid expenses without deleting the historical audit trail.
-            </p>
+      {/* Edit Expense Modal */}
+      {editingExpense && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl p-5 sm:p-6 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-slate-900 text-base">
+                Edit Expense ({editingExpense.voucherNumber})
+              </h3>
+              <button
+                onClick={() => setEditingExpense(null)}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <form onSubmit={handleConfirmReversal} className="mt-4 space-y-3 text-xs sm:text-sm">
+            <form onSubmit={handleUpdateExpense} className="space-y-3.5 mt-4 text-xs sm:text-sm">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Reversal Reason (Mandatory) *
-                </label>
+                <label className="block font-semibold text-slate-700 mb-1">Title *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Duplicate entry or vendor refund"
-                  value={reversalReason}
-                  onChange={(e) => setReversalReason(e.target.value)}
+                  value={editingExpense.title || editingExpense.description}
+                  onChange={(e) => setEditingExpense({ ...editingExpense, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Amount (PKR) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={editingExpense.amount}
+                    onChange={(e) => setEditingExpense({ ...editingExpense, amount: parseInt(e.target.value, 10) || 0 })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-rose-700"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={editingExpense.date}
+                    onChange={(e) => setEditingExpense({ ...editingExpense, date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Paid To *</label>
+                <input
+                  type="text"
+                  required
+                  value={editingExpense.paidTo}
+                  onChange={(e) => setEditingExpense({ ...editingExpense, paidTo: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={editingExpense.description}
+                  onChange={(e) => setEditingExpense({ ...editingExpense, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setReversingExpense(null)}
-                  className="px-3 py-1.5 bg-slate-200 rounded-lg font-semibold"
+                  onClick={() => setEditingExpense(null)}
+                  className="px-4 py-2 bg-slate-200 rounded-lg font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-lg font-bold"
+                  className="px-5 py-2 bg-emerald-700 text-white rounded-lg font-bold"
                 >
-                  Confirm Reversal
+                  Save Changes
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Expense Modal */}
+      {deletingExpenseId && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl animate-in zoom-in-95">
+            <h3 className="font-bold text-slate-900 text-base">Confirm Expense Deletion</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Are you sure you want to delete this expense voucher? It will be removed from database totals and balance calculations immediately.
+            </p>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setDeletingExpenseId(null)}
+                className="px-3 py-1.5 bg-slate-200 rounded-lg text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteExpense(deletingExpenseId)}
+                className="px-4 py-1.5 bg-rose-700 text-white rounded-lg text-xs font-bold"
+              >
+                Yes, Delete
+              </button>
+            </div>
           </div>
         </div>
       )}

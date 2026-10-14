@@ -10,19 +10,20 @@ import {
   FileSpreadsheet,
   Printer,
   X,
-  RotateCcw,
+  Edit2,
+  Trash2,
   CheckCircle2,
 } from 'lucide-react';
 
 export const IncomeManagement: React.FC = () => {
-  const { state, language, addIncome, reverseIncome } = useApp();
+  const { state, language, isAdmin, addIncome, updateIncome, deleteIncome } = useApp();
   const t = translations[language];
 
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [reversingIncome, setReversingIncome] = useState<IncomeRecord | null>(null);
-  const [reversalReason, setReversalReason] = useState('');
+  const [editingIncome, setEditingIncome] = useState<IncomeRecord | null>(null);
+  const [deletingIncomeId, setDeletingIncomeId] = useState<string | null>(null);
 
   // Form State
   const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
@@ -44,7 +45,7 @@ export const IncomeManagement: React.FC = () => {
   ];
 
   const validIncomes = useMemo(() => {
-    return state.incomes.filter((i) => i.status !== 'reversed');
+    return (state.incomes || []).filter((i) => i.status !== 'reversed');
   }, [state.incomes]);
 
   const totalIncomeSum = useMemo(() => {
@@ -52,7 +53,7 @@ export const IncomeManagement: React.FC = () => {
   }, [validIncomes]);
 
   const filteredIncomes = useMemo(() => {
-    return state.incomes.filter((i) => {
+    return (state.incomes || []).filter((i) => {
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
@@ -89,16 +90,31 @@ export const IncomeManagement: React.FC = () => {
     setIsAddModalOpen(false);
   };
 
-  const handleConfirmReversal = (e: React.FormEvent) => {
+  const handleUpdateIncome = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reversingIncome || !reversalReason.trim()) return;
-    reverseIncome(reversingIncome.id, reversalReason.trim());
-    setReversingIncome(null);
-    setReversalReason('');
+    if (!editingIncome) return;
+
+    updateIncome(editingIncome.id, {
+      date: editingIncome.date,
+      category: editingIncome.category,
+      receivedFrom: editingIncome.receivedFrom,
+      description: editingIncome.description,
+      amount: Math.round(editingIncome.amount),
+      paymentMethod: editingIncome.paymentMethod,
+      receiptNumber: editingIncome.receiptNumber,
+      notes: editingIncome.notes,
+    });
+
+    setEditingIncome(null);
+  };
+
+  const handleDeleteIncome = (id: string) => {
+    deleteIncome(id);
+    setDeletingIncomeId(null);
   };
 
   const handleExportCsv = () => {
-    const headers = ['Income ID', 'Date', 'Category', 'Description', 'Amount (PKR)', 'Received From', 'Receipt #', 'Status'];
+    const headers = ['Income ID', 'Date', 'Category', 'Description', 'Amount (PKR)', 'Received From', 'Receipt #'];
     const rows = state.incomes.map((i) => [
       `"${i.id}"`,
       `"${i.date}"`,
@@ -107,14 +123,13 @@ export const IncomeManagement: React.FC = () => {
       i.amount,
       `"${i.receivedFrom}"`,
       `"${i.receiptNumber}"`,
-      `"${i.status}"`,
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
     const encoded = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encoded);
-    link.setAttribute('download', `AFB_General_Income_${new Date().toISOString().substring(0, 10)}.csv`);
+    link.setAttribute('download', `AFB_Karachi_Donations_${new Date().toISOString().substring(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -126,10 +141,10 @@ export const IncomeManagement: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">
-            {t.income.title}
+            عطیات و دیگر آمدن (Donations & General Income)
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            {t.income.subtitle}
+            Add, edit, and delete welfare donations, community grants, and non-fee income
           </p>
         </div>
 
@@ -148,13 +163,15 @@ export const IncomeManagement: React.FC = () => {
             <Printer className="w-4 h-4 text-slate-600" />
             <span className="hidden sm:inline">Print</span>
           </button>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md cursor-pointer transition"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>{t.income.addIncome}</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md cursor-pointer transition"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Record Donation</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -221,13 +238,12 @@ export const IncomeManagement: React.FC = () => {
                 <th className="py-2.5 px-3 sm:px-4">Description</th>
                 <th className="py-2.5 px-3 sm:px-4">Receipt #</th>
                 <th className="py-2.5 px-3 sm:px-4 text-right">Amount (PKR)</th>
-                <th className="py-2.5 px-3 sm:px-4 text-center">Status</th>
-                <th className="py-2.5 px-3 sm:px-4 text-center no-print">Action</th>
+                {isAdmin && <th className="py-2.5 px-3 sm:px-4 text-center no-print">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredIncomes.map((inc) => (
-                <tr key={inc.id} className={`hover:bg-slate-50 transition ${inc.status === 'reversed' ? 'opacity-50 line-through bg-slate-50' : ''}`}>
+                <tr key={inc.id} className="hover:bg-slate-50 transition">
                   <td className="py-2.5 px-3 sm:px-4 whitespace-nowrap font-mono text-slate-600">
                     {formatDate(inc.date)}
                   </td>
@@ -246,26 +262,26 @@ export const IncomeManagement: React.FC = () => {
                   <td className="py-2.5 px-3 sm:px-4 text-right font-extrabold text-teal-700 whitespace-nowrap">
                     {formatCurrency(inc.amount)}
                   </td>
-                  <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                        inc.status === 'reversed' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'
-                      }`}
-                    >
-                      {inc.status}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 sm:px-4 text-center no-print">
-                    {inc.status !== 'reversed' && (
-                      <button
-                        onClick={() => setReversingIncome(inc)}
-                        title="Auditable Reversal"
-                        className="p-1 text-slate-400 hover:text-red-700 rounded hover:bg-red-50 cursor-pointer"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </td>
+                  {isAdmin && (
+                    <td className="py-2.5 px-3 sm:px-4 text-center no-print">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => setEditingIncome(inc)}
+                          title="Edit Income"
+                          className="p-1 text-slate-500 hover:text-slate-800 rounded hover:bg-slate-100"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingIncomeId(inc.id)}
+                          title="Delete Income"
+                          className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -277,11 +293,17 @@ export const IncomeManagement: React.FC = () => {
                 <td className="py-3 px-3 sm:px-4 text-right text-teal-700 text-base">
                   {formatCurrency(totalIncomeSum)}
                 </td>
-                <td colSpan={2}></td>
+                {isAdmin && <td></td>}
               </tr>
             </tfoot>
           </table>
         </div>
+
+        {filteredIncomes.length === 0 && (
+          <div className="text-center py-10 text-slate-400 text-xs sm:text-sm">
+            No donations recorded yet. All old sample donations were removed as requested.
+          </div>
+        )}
       </div>
 
       {/* Add Income Modal */}
@@ -290,7 +312,7 @@ export const IncomeManagement: React.FC = () => {
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl p-5 sm:p-6 animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-slate-900 text-base sm:text-lg">
-                {t.income.addIncome}
+                Record New Donation / Income
               </h3>
               <button
                 onClick={() => setIsAddModalOpen(false)}
@@ -378,34 +400,22 @@ export const IncomeManagement: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Cemetery water tank development grant"
+                  placeholder="e.g. Cemetery water supply development grant"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Receipt / Ref #</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. DON-2026-03"
-                    value={receiptNumber}
-                    onChange={(e) => setReceiptNumber(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Notes</label>
-                  <input
-                    type="text"
-                    placeholder="Restricted or general welfare"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                  />
-                </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Receipt / Ref #</label>
+                <input
+                  type="text"
+                  placeholder="e.g. DON-2026-03"
+                  value={receiptNumber}
+                  onChange={(e) => setReceiptNumber(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                />
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
@@ -420,7 +430,7 @@ export const IncomeManagement: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold shadow-md"
                 >
-                  Record Income
+                  Save Donation
                 </button>
               </div>
             </form>
@@ -428,48 +438,112 @@ export const IncomeManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Reversal Modal */}
-      {reversingIncome && (
-        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl p-5 animate-in zoom-in-95">
-            <h3 className="font-bold text-slate-900 text-base">
-              Reverse Income Record ({reversingIncome.receiptNumber})
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Reversing will auditably deduct PKR {formatCurrency(reversingIncome.amount)} from valid income without deleting the historical audit trail.
-            </p>
+      {/* Edit Income Modal */}
+      {editingIncome && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl p-5 sm:p-6 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-slate-900 text-base">
+                Edit Donation / Income Record
+              </h3>
+              <button
+                onClick={() => setEditingIncome(null)}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <form onSubmit={handleConfirmReversal} className="mt-4 space-y-3 text-xs sm:text-sm">
+            <form onSubmit={handleUpdateIncome} className="space-y-3.5 mt-4 text-xs sm:text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Amount (PKR) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={editingIncome.amount}
+                    onChange={(e) => setEditingIncome({ ...editingIncome, amount: parseInt(e.target.value, 10) || 0 })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-teal-700"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={editingIncome.date}
+                    onChange={(e) => setEditingIncome({ ...editingIncome, date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Reversal Reason (Mandatory) *
-                </label>
+                <label className="block font-semibold text-slate-700 mb-1">Received From *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Entered incorrect donor amount"
-                  value={reversalReason}
-                  onChange={(e) => setReversalReason(e.target.value)}
+                  value={editingIncome.receivedFrom}
+                  onChange={(e) => setEditingIncome({ ...editingIncome, receivedFrom: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Description *</label>
+                <input
+                  type="text"
+                  required
+                  value={editingIncome.description}
+                  onChange={(e) => setEditingIncome({ ...editingIncome, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setReversingIncome(null)}
-                  className="px-3 py-1.5 bg-slate-200 rounded-lg font-semibold"
+                  onClick={() => setEditingIncome(null)}
+                  className="px-4 py-2 bg-slate-200 rounded-lg font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-lg font-bold"
+                  className="px-5 py-2 bg-emerald-700 text-white font-bold rounded-lg"
                 >
-                  Confirm Reversal
+                  Save Changes
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Income Modal */}
+      {deletingIncomeId && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-3">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl animate-in zoom-in-95">
+            <h3 className="font-bold text-slate-900 text-base">Confirm Donation Deletion</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Are you sure you want to delete this donation record? It will be permanently deducted from total income and available cash balance.
+            </p>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setDeletingIncomeId(null)}
+                className="px-3 py-1.5 bg-slate-200 rounded-lg text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteIncome(deletingIncomeId)}
+                className="px-4 py-1.5 bg-rose-700 text-white rounded-lg text-xs font-bold"
+              >
+                Yes, Delete
+              </button>
+            </div>
           </div>
         </div>
       )}

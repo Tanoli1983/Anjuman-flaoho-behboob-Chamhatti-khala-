@@ -4,6 +4,7 @@ import { translations } from '../i18n/translations';
 import {
   LayoutDashboard,
   Users,
+  UserCheck,
   CalendarCheck,
   HeartHandshake,
   ReceiptText,
@@ -13,6 +14,7 @@ import {
   FileSpreadsheet,
   Database,
   Settings,
+  Bell,
   Menu,
   X,
 } from 'lucide-react';
@@ -25,11 +27,13 @@ export const Navigation: React.FC = () => {
   const mainTabs = [
     { id: 'dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
     { id: 'members', label: t.nav.members, icon: Users },
+    { id: 'officeBearers', label: 'Office-Bearers (عہدیداران)', icon: UserCheck },
     { id: 'monthly', label: t.nav.monthlyFees, icon: CalendarCheck },
     { id: 'emergency', label: t.nav.emergencyFees, icon: HeartHandshake },
     { id: 'payment', label: t.nav.collectPayment, icon: ReceiptText, primary: true },
     { id: 'expenses', label: t.nav.expenses, icon: TrendingDown },
     { id: 'income', label: t.nav.income, icon: BadgeDollarSign },
+    { id: 'announcements', label: 'Notices (اعلانات)', icon: Bell },
     { id: 'ledger', label: t.nav.ledger, icon: BookOpen },
     { id: 'reports', label: t.nav.reports, icon: FileSpreadsheet },
     { id: 'backup', label: t.nav.backup, icon: Database },
@@ -41,7 +45,7 @@ export const Navigation: React.FC = () => {
     { id: 'dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
     { id: 'members', label: t.nav.members, icon: Users },
     { id: 'payment', label: t.nav.collectPayment, icon: ReceiptText, primary: true },
-    { id: 'monthly', label: t.nav.monthlyFees, icon: CalendarCheck },
+    { id: 'officeBearers', label: 'عہدیداران', icon: UserCheck },
   ];
 
   const handleSelectTab = (id: string) => {
@@ -62,7 +66,7 @@ export const Navigation: React.FC = () => {
                 <button
                   key={tab.id}
                   onClick={() => handleSelectTab(tab.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs lg:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs lg:text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
                     isActive
                       ? 'bg-emerald-700 text-white shadow-xs'
                       : tab.primary
@@ -125,7 +129,7 @@ export const Navigation: React.FC = () => {
         <div className="md:hidden fixed inset-0 bg-slate-900/60 z-50 flex flex-col justify-end no-print">
           <div className="bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto p-4 shadow-2xl animate-in slide-in-from-bottom duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3">
-              <h3 className="font-bold text-slate-800 text-base">Menu & Modules</h3>
+              <h3 className="font-bold text-slate-800 text-base">Menu & Navigation</h3>
               <button
                 onClick={() => setMobileMenuOpen(false)}
                 className="p-1 rounded-full text-slate-500 hover:bg-slate-100"

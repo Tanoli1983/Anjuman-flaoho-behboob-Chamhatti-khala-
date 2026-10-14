@@ -10,10 +10,25 @@ import {
   Coins,
   Users,
   ShieldAlert,
+  ShieldCheck,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  RotateCcw,
 } from 'lucide-react';
 
 export const Settings: React.FC = () => {
-  const { state, language, updateSettings } = useApp();
+  const {
+    state,
+    language,
+    updateSettings,
+    isAdmin,
+    isPasswordConfigured,
+    updateAdminPin,
+    setupInitialAdminPassword,
+    resetAdminToSetupMode,
+  } = useApp();
   const t = translations[language];
 
   const [orgName, setOrgName] = useState(state.settings.orgName);
@@ -29,6 +44,17 @@ export const Settings: React.FC = () => {
   const [openingCashBalance, setOpeningCashBalance] = useState<number>(state.settings.openingCashBalance);
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Password & Security Management
+  const [secCurrentPassword, setSecCurrentPassword] = useState('');
+  const [secNewPassword, setSecNewPassword] = useState('');
+  const [secConfirmPassword, setSecConfirmPassword] = useState('');
+  const [secQuestion, setSecQuestion] = useState(
+    state.settings.securityQuestion || 'What is the registered city of the Anjuman?'
+  );
+  const [secAnswer, setSecAnswer] = useState(state.settings.securityAnswer || 'Karachi');
+  const [showSecPassword, setShowSecPassword] = useState(false);
+  const [secFeedback, setSecFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,6 +294,212 @@ export const Settings: React.FC = () => {
                 <span className="text-xs text-slate-500 font-mono">{ob.phone}</span>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Administrator Security & Password Management */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 sm:p-6 space-y-4 text-xs sm:text-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
+            <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-700" />
+              <span>Administrator Password & Security Management / ایڈمنسٹریٹر پاس ورڈ</span>
+            </h3>
+            <div className="flex items-center gap-2">
+              <span
+                className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                  isPasswordConfigured
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-amber-100 text-amber-800'
+                }`}
+              >
+                {isPasswordConfigured ? 'Password Configured' : 'Setup Required'}
+              </span>
+              {isAdmin && (
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                  Admin Logged In
+                </span>
+              )}
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-600">
+            Authorized administrators use this password to unlock editing, updating, and deleting records (Members, Office-Bearers, Payments, Monthly Fees, and Expenses).
+          </p>
+
+          {secFeedback && (
+            <div
+              className={`p-3 rounded-xl flex items-center gap-2 text-xs sm:text-sm ${
+                secFeedback.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-900 font-semibold'
+                  : 'bg-rose-50 border border-rose-200 text-rose-900'
+              }`}
+            >
+              {secFeedback.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              )}
+              <span>{secFeedback.message}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {isPasswordConfigured && (
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Current Password / موجودہ پاس ورڈ *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSecPassword ? 'text' : 'password'}
+                    value={secCurrentPassword}
+                    onChange={(e) => setSecCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg pr-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecPassword(!showSecPassword)}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                  >
+                    {showSecPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                New Password / نیا پاس ورڈ *
+              </label>
+              <input
+                type={showSecPassword ? 'text' : 'password'}
+                value={secNewPassword}
+                onChange={(e) => setSecNewPassword(e.target.value)}
+                placeholder="Min 4 characters"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
+              />
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Confirm New Password / تصدیق *
+              </label>
+              <input
+                type={showSecPassword ? 'text' : 'password'}
+                value={secConfirmPassword}
+                onChange={(e) => setSecConfirmPassword(e.target.value)}
+                placeholder="Confirm password"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Security Recovery Question (پاس ورڈ ریکوری سوال)
+              </label>
+              <input
+                type="text"
+                value={secQuestion}
+                onChange={(e) => setSecQuestion(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Security Recovery Answer (جواب)
+              </label>
+              <input
+                type="text"
+                value={secAnswer}
+                onChange={(e) => setSecAnswer(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+              />
+            </div>
+          </div>
+
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <span className="text-slate-600">
+              Master Emergency Recovery Key (Keep confidential):
+            </span>
+            <span className="font-mono font-bold bg-white px-2.5 py-1 rounded border border-slate-300 text-slate-900">
+              {state.settings.recoverySecretKey || 'AFB-RECOVER-2026'}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  confirm(
+                    'Are you sure you want to reset password settings back to setup mode?'
+                  )
+                ) {
+                  resetAdminToSetupMode();
+                  setSecFeedback({
+                    type: 'success',
+                    message:
+                      'Admin password reset. Initial setup mode is now active.',
+                  });
+                }
+              }}
+              className="px-3 py-2 text-xs text-amber-700 hover:text-amber-900 border border-amber-200 bg-amber-50 rounded-xl flex items-center gap-1.5 cursor-pointer font-medium"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset to Initial Setup Mode</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSecFeedback(null);
+                if (secNewPassword.length < 4) {
+                  setSecFeedback({
+                    type: 'error',
+                    message: 'New password must be at least 4 characters long.',
+                  });
+                  return;
+                }
+                if (secNewPassword !== secConfirmPassword) {
+                  setSecFeedback({
+                    type: 'error',
+                    message: 'New password and confirmation do not match.',
+                  });
+                  return;
+                }
+
+                if (!isPasswordConfigured) {
+                  const res = setupInitialAdminPassword(secNewPassword, secQuestion, secAnswer);
+                  setSecFeedback({
+                    type: res.success ? 'success' : 'error',
+                    message: res.message,
+                  });
+                  if (res.success) {
+                    setSecCurrentPassword('');
+                    setSecNewPassword('');
+                    setSecConfirmPassword('');
+                  }
+                } else {
+                  const res = updateAdminPin(secCurrentPassword, secNewPassword, secQuestion, secAnswer);
+                  setSecFeedback({
+                    type: res.success ? 'success' : 'error',
+                    message: res.message,
+                  });
+                  if (res.success) {
+                    setSecCurrentPassword('');
+                    setSecNewPassword('');
+                    setSecConfirmPassword('');
+                  }
+                }
+              }}
+              className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow cursor-pointer transition flex items-center gap-2 text-xs sm:text-sm"
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>Save Admin Password & Security</span>
+            </button>
           </div>
         </div>
 

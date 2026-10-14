@@ -13,15 +13,19 @@ import {
   Users,
   CheckCircle2,
   ReceiptText,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 
 export const EmergencyFees: React.FC<{ onSelectMemberForPayment: (memberId: string) => void }> = ({
   onSelectMemberForPayment,
 }) => {
-  const { state, language, createEmergencyEvent } = useApp();
+  const { state, language, isAdmin, createEmergencyEvent, updateEmergencyEvent, deleteEmergencyEvent } = useApp();
   const t = translations[language];
 
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EmergencyEvent | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(
     state.emergencyEvents[0]?.id || null
   );
@@ -77,6 +81,31 @@ export const EmergencyFees: React.FC<{ onSelectMemberForPayment: (memberId: stri
     setDeceasedRelation('');
     setDescription('');
     setNotes('');
+  };
+
+  const handleUpdateEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEvent || !editingEvent.deceasedName.trim()) return;
+
+    updateEmergencyEvent(editingEvent.id, {
+      deceasedName: editingEvent.deceasedName.trim(),
+      deceasedRelation: editingEvent.deceasedRelation?.trim() || '',
+      dateOfDeath: editingEvent.dateOfDeath,
+      description: editingEvent.description.trim(),
+      feePerMember: editingEvent.feePerMember,
+      notes: editingEvent.notes,
+    });
+
+    setEditingEvent(null);
+  };
+
+  const handleDeleteEvent = (id: string) => {
+    deleteEmergencyEvent(id);
+    setDeletingEventId(null);
+    if (selectedEventId === id) {
+      const remaining = state.emergencyEvents.filter(e => e.id !== id);
+      setSelectedEventId(remaining[0]?.id || null);
+    }
   };
 
   const handleExportCsv = () => {
@@ -220,13 +249,35 @@ export const EmergencyFees: React.FC<{ onSelectMemberForPayment: (memberId: stri
                   </p>
                 </div>
 
-                <button
-                  onClick={handleExportCsv}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-semibold self-start sm:self-auto cursor-pointer"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Export Event CSV</span>
-                </button>
+                <div className="flex items-center gap-1.5 self-start sm:self-auto flex-wrap">
+                  <button
+                    onClick={handleExportCsv}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Export CSV</span>
+                  </button>
+                  {isAdmin && (
+                    <>
+                      <button
+                        onClick={() => setEditingEvent(selectedEvent)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-xs font-semibold cursor-pointer border border-purple-200"
+                        title="Edit Event"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => setDeletingEventId(selectedEvent.id)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-semibold cursor-pointer border border-rose-200"
+                        title="Delete Event"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Event Metrics Bar */}
@@ -426,12 +477,156 @@ export const EmergencyFees: React.FC<{ onSelectMemberForPayment: (memberId: stri
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg font-bold shadow-md"
+                  className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg font-bold shadow-md cursor-pointer"
                 >
                   Record Event & Generate Obligations
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Emergency Event Modal */}
+      {editingEvent && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                Edit Death Event / ہنگامی کیس میں ترمیم
+              </h3>
+              <button
+                onClick={() => setEditingEvent(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateEvent} className="mt-4 space-y-3 sm:space-y-4 text-xs sm:text-sm">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Name of Deceased (مرحوم / مرحومہ کا نام)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingEvent.deceasedName}
+                  onChange={(e) => setEditingEvent({ ...editingEvent, deceasedName: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Relationship / Family (تعلق / رشتہ)
+                  </label>
+                  <input
+                    type="text"
+                    value={editingEvent.deceasedRelation || ''}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, deceasedRelation: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Date of Death (تاریخ وفات)
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editingEvent.dateOfDeath}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, dateOfDeath: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Emergency Fee Per Member (روپے فی ممبر)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editingEvent.feePerMember}
+                  onChange={(e) => setEditingEvent({ ...editingEvent, feePerMember: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Description / تفصیلات
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingEvent.description}
+                  onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Administrative Notes / خصوصی نوٹ
+                </label>
+                <input
+                  type="text"
+                  value={editingEvent.notes || ''}
+                  onChange={(e) => setEditingEvent({ ...editingEvent, notes: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setEditingEvent(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl font-bold shadow-md cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingEventId && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200">
+            <h3 className="text-base font-bold text-slate-900">
+              Delete Death Event / ہنگامی کیس ڈیلیٹ کریں؟
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+              Are you sure you want to delete this recorded death event? Associated member obligations will be cleaned accordingly.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeletingEventId(null)}
+                className="px-4 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteEvent(deletingEventId)}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs cursor-pointer"
+              >
+                Yes, Delete Event
+              </button>
+            </div>
           </div>
         </div>
       )}

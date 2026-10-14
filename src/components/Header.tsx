@@ -2,24 +2,22 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { translations } from '../i18n/translations';
 import { formatCurrency } from '../utils/formatters';
-import { Globe, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Globe, ShieldCheck, CheckCircle2, Lock, Unlock } from 'lucide-react';
 import { Language, UserRole } from '../types';
 
-export const Header: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }) => {
-  const { state, language, setLanguage, currentRole, setCurrentRole, accountingSummary } = useApp();
+interface HeaderProps {
+  onOpenTests: () => void;
+  onOpenAdminLogin: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onOpenTests, onOpenAdminLogin }) => {
+  const { state, language, setLanguage, currentRole, setCurrentRole, accountingSummary, isAdmin } = useApp();
   const t = translations[language];
 
   const languages: { code: Language; label: string }[] = [
     { code: 'ur', label: 'اردو' },
     { code: 'ur_roman', label: 'Roman Urdu' },
     { code: 'en', label: 'English' },
-  ];
-
-  const roles: { code: UserRole; label: string }[] = [
-    { code: 'super_admin', label: 'Super Admin (ایڈمن)' },
-    { code: 'treasurer', label: 'Treasurer (خزانچی)' },
-    { code: 'secretary', label: 'Secretary (سیکرٹری)' },
-    { code: 'auditor', label: 'Auditor (آڈیٹر)' },
   ];
 
   return (
@@ -32,17 +30,17 @@ export const Header: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }) =
               <span className="text-emerald-200 font-bold text-base sm:text-lg">AFB</span>
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm sm:text-base md:text-lg font-bold leading-tight truncate text-emerald-50">
+              <h1 className="text-xs sm:text-sm md:text-base font-bold leading-tight truncate text-emerald-50">
                 {state.settings.orgName}
               </h1>
-              <p className="text-xs text-emerald-200/90 font-urdu truncate leading-snug">
+              <p className="text-[11px] sm:text-xs text-emerald-200/90 font-urdu truncate leading-snug">
                 {state.settings.orgNameUrdu}
               </p>
             </div>
           </div>
 
-          {/* Controls: Cash badge, Language, Role, Test button */}
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          {/* Controls: Cash badge, Language, Admin status, Test button */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Quick Cash Balance Badge */}
             <div className="hidden lg:flex flex-col items-end px-3 py-1 bg-emerald-900/60 rounded-lg border border-emerald-700">
               <span className="text-[10px] text-emerald-300 font-medium uppercase tracking-wider">
@@ -70,31 +68,37 @@ export const Header: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }) =
               </select>
             </div>
 
-            {/* Role Switcher */}
-            <div className="hidden md:flex items-center bg-emerald-900/70 rounded-lg p-0.5 border border-emerald-700/60 text-xs">
-              <ShieldCheck className="w-3.5 h-3.5 ml-1.5 text-emerald-300 shrink-0" />
-              <select
-                aria-label="Select User Role"
-                value={currentRole}
-                onChange={(e) => setCurrentRole(e.target.value as UserRole)}
-                className="bg-transparent text-white text-xs px-2 py-1 rounded cursor-pointer focus:outline-none font-medium"
-              >
-                {roles.map((r) => (
-                  <option key={r.code} value={r.code} className="bg-slate-800 text-white">
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Admin Security Badge */}
+            <button
+              onClick={onOpenAdminLogin}
+              title={isAdmin ? 'Administrator Mode Active' : 'Click to Login as Admin'}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-xs ${
+                isAdmin
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400'
+                  : 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 border border-emerald-700'
+              }`}
+            >
+              {isAdmin ? (
+                <>
+                  <Unlock className="w-3.5 h-3.5 text-emerald-300" />
+                  <span className="hidden sm:inline">Admin Mode</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3.5 h-3.5 text-amber-300" />
+                  <span className="hidden sm:inline">Admin Login</span>
+                </>
+              )}
+            </button>
 
             {/* Test Suite Button */}
             <button
               onClick={onOpenTests}
-              title="Run Accounting Tests A to K"
+              title="Run Accounting Tests"
               className="flex items-center gap-1 bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-900 font-bold px-2.5 py-1.5 rounded-lg text-xs shadow transition cursor-pointer"
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />
-              <span className="hidden sm:inline">Tests A-K</span>
+              <span className="hidden sm:inline">Audit Tests</span>
             </button>
           </div>
         </div>

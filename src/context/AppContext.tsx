@@ -7,11 +7,14 @@ import {
   PaymentRecord,
   ExpenseRecord,
   IncomeRecord,
+  Announcement,
+  OfficeBearer,
   OrganizationSettings,
   Language,
   UserRole,
   PaymentAllocation,
   PaymentMethod,
+  PaymentCategory,
 } from '../types';
 import { initialAppState } from '../store/initialData';
 import {
@@ -20,10 +23,16 @@ import {
 } from '../utils/formatters';
 import { computeAccountingSummary, computeMemberSummary } from '../utils/accounting';
 
-const STORAGE_KEY = 'AFB_CHAMHATTI_DB_V1';
-const LANG_STORAGE_KEY = 'AFB_CHAMHATTI_LANG_V1';
-const ROLE_STORAGE_KEY = 'AFB_CHAMHATTI_ROLE_V1';
-const PRE_RESTORE_BACKUP_KEY = 'AFB_CHAMHATTI_PRE_RESTORE_SNAPSHOT';
+const STORAGE_KEY = 'AFB_KARACHI_CLEAN_V3';
+const LANG_STORAGE_KEY = 'AFB_KARACHI_LANG_V3';
+const AUTH_STORAGE_KEY = 'AFB_KARACHI_ADMIN_AUTH_V3';
+
+// Clear out any older storage keys that might have sample/test transactions
+try {
+  ['AFB_KARACHI_DB_V2', 'AFB_KARACHI_DB_V1', 'AFB_MANAGEMENT_DB_v1'].forEach((oldKey) => {
+    localStorage.removeItem(oldKey);
+  });
+} catch (_) {}
 
 interface AppContextType {
   state: AppState;
@@ -33,10 +42,21 @@ interface AppContextType {
   setCurrentRole: (role: UserRole) => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  // Admin Security
+  isAdmin: boolean;
+  isPasswordConfigured: boolean;
+  adminLogin: (password: string) => boolean;
+  adminLogout: () => void;
+  setupInitialAdminPassword: (password: string, question?: string, answer?: string) => { success: boolean; message: string };
+  updateAdminPin: (oldPin: string, newPin: string, question?: string, answer?: string) => { success: boolean; message: string };
+  recoverAdminPassword: (answerOrKey: string, newPassword: string) => { success: boolean; message: string };
+  resetAdminToSetupMode: () => void;
   // Summary
   accountingSummary: ReturnType<typeof computeAccountingSummary>;
   getMemberSummary: (memberId: string) => ReturnType<typeof computeMemberSummary> | null;
-  // Members
+  // Clean financial records
+  cleanAllFinancialRecords: () => void;
+  // Members CRUD
   addMember: (memberData: {
     fullName: string;
     fatherName: string;
@@ -44,49 +64,71 @@ interface AppContextType {
     address: string;
     joiningDate: string;
     notes?: string;
-    initialPaymentReceived?: number;
-    paymentMethod?: PaymentMethod;
-  }) => { member: Member; receiptNumber?: string };
+  }) => Member;
   updateMember: (id: string, updates: Partial<Member>) => void;
-  archiveMember: (id: string, reason: string) => void;
-  // Monthly Fees
-  generateMonthlyFees: (month: string) => { createdCount: number; skippedCount: number };
+  deleteMember: (id: string) => void;
+  // Office Bearers CRUD
+  addOfficeBearer: (data: Omit<OfficeBearer, 'id'>) => OfficeBearer;
+  updateOfficeBearer: (id: string, updates: Partial<OfficeBearer>) => void;
+  deleteOfficeBearer: (id: string) => void;
+  // Payments CRUD
+  addPayment: (data: {
+    memberId: string;
+    amountReceived: number;
+    paymentCategory: PaymentCategory;
+    paymentMethod: PaymentMethod;
+    date: string;
+    relevantPeriod?: string;
+    notes?: string;
+  }) => PaymentRecord;
+  updatePayment: (id: string, updates: Partial<PaymentRecord>) => void;
+  deletePayment: (id: string) => void;
+  latestReceipt: PaymentRecord | null;
+  setLatestReceipt: (p: PaymentRecord | null) => void;
+  // Monthly Fees Operations
+  generateMonthlyFees: (targetMonth: string) => { createdCount: number; skippedCount: number };
   recordBulkMonthlyPayment: (
-    memberIds: string[],
-    month: string,
-    amountPerMember: number,
-    paymentMethod: PaymentMethod
-  ) => { paymentCount: number };
-  // Emergency Fees
-  createEmergencyEvent: (eventData: {
+    arg1: string[] | { memberIds: string[]; month: string; amountPerMember: number; paymentMethod: PaymentMethod; notes?: string },
+    month?: string,
+    amountPerMember?: number,
+    paymentMethod?: PaymentMethod,
+    notes?: string
+  ) => { paymentCount: number; receiptsCount: number };
+  // Expenses CRUD
+  addExpense: (data: Omit<ExpenseRecord, 'id' | 'createdAt' | 'lastModified' | 'status' | 'createdBy'>) => ExpenseRecord;
+  updateExpense: (id: string, updates: Partial<ExpenseRecord>) => void;
+  deleteExpense: (id: string) => void;
+  // Incomes CRUD
+  addIncome: (data: Omit<IncomeRecord, 'id' | 'createdAt' | 'status' | 'recordedBy'>) => IncomeRecord;
+  updateIncome: (id: string, updates: Partial<IncomeRecord>) => void;
+  deleteIncome: (id: string) => void;
+  // Emergency Events CRUD
+  createEmergencyEvent: (data: {
     deceasedName: string;
     deceasedRelation?: string;
     dateOfDeath: string;
     description: string;
     feePerMember?: number;
-    notes?: string;
     funeralExpenseAmount?: number;
     funeralExpensePaidTo?: string;
-  }) => EmergencyEvent;
-  // Payments & Receipts
-  recordPayment: (paymentData: {
-    memberId: string;
-    amountReceived: number;
-    paymentDate: string;
-    paymentMethod: PaymentMethod;
     notes?: string;
-    allocations: PaymentAllocation[];
-  }) => PaymentRecord;
-  reversePayment: (paymentId: string, reason: string) => void;
-  latestReceipt: PaymentRecord | null;
-  setLatestReceipt: (p: PaymentRecord | null) => void;
-  // Income
-  addIncome: (incomeData: Omit<IncomeRecord, 'id' | 'createdAt' | 'status' | 'recordedBy'>) => IncomeRecord;
-  reverseIncome: (incomeId: string, reason: string) => void;
-  // Expenses
-  addExpense: (expenseData: Omit<ExpenseRecord, 'id' | 'createdAt' | 'lastModified' | 'status' | 'createdBy'>) => ExpenseRecord;
-  updateExpense: (id: string, updates: Partial<ExpenseRecord>) => void;
-  reverseExpense: (expenseId: string, reason: string) => void;
+  }) => EmergencyEvent;
+  addEmergencyEvent: (data: {
+    deceasedName: string;
+    deceasedRelation?: string;
+    dateOfDeath: string;
+    description: string;
+    feePerMember?: number;
+    funeralExpenseAmount?: number;
+    funeralExpensePaidTo?: string;
+    notes?: string;
+  }) => EmergencyEvent;
+  updateEmergencyEvent: (id: string, updates: Partial<EmergencyEvent>) => void;
+  deleteEmergencyEvent: (id: string) => void;
+  // Announcements CRUD
+  addAnnouncement: (data: Omit<Announcement, 'id' | 'createdAt'>) => Announcement;
+  updateAnnouncement: (id: string, updates: Partial<Announcement>) => void;
+  deleteAnnouncement: (id: string) => void;
   // Settings & Backup
   updateSettings: (updates: Partial<OrganizationSettings>) => void;
   exportBackupJson: () => string;
@@ -102,22 +144,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return (saved as Language) || 'ur';
   });
 
-  const [currentRole, setCurrentRoleState] = useState<UserRole>(() => {
-    const saved = localStorage.getItem(ROLE_STORAGE_KEY);
-    return (saved as UserRole) || 'super_admin';
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    const auth = localStorage.getItem(AUTH_STORAGE_KEY);
+    return auth === 'true';
   });
 
+  const [currentRole, setCurrentRoleState] = useState<UserRole>('super_admin');
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [latestReceipt, setLatestReceipt] = useState<PaymentRecord | null>(null);
 
-  // Initialize state with persistence check
+  // Initialize state with persistence & enforce clean financial slate
   const [state, setState] = useState<AppState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.settings && Array.isArray(parsed.members) && Array.isArray(parsed.obligations)) {
-          return parsed;
+        if (parsed.settings && Array.isArray(parsed.members)) {
+          return {
+            ...parsed,
+            settings: {
+              ...initialAppState.settings,
+              ...parsed.settings,
+              orgName: 'Anjuman Falah-o-Bahbood Chamhatti Wa Khalabat Butt Karachi',
+              orgNameUrdu: 'انجمن فلاح و بہبود چھمھٹی و خالصہ بٹ کراچی',
+              registrationFee: parsed.settings.registrationFee || 200,
+              monthlyFee: parsed.settings.monthlyFee || 100,
+              emergencyFee: parsed.settings.emergencyFee || 100,
+              currencySymbol: 'Rs.',
+            },
+            // Keep member registration records intact!
+            members: parsed.members.length > 0 ? parsed.members : initialAppState.members,
+            // Keep office bearers intact
+            officeBearers: parsed.settings?.officeBearers || initialAppState.settings.officeBearers,
+            // Clean financial transactions to fresh state
+            payments: parsed.payments || [],
+            expenses: parsed.expenses || [],
+            incomes: parsed.incomes || [],
+            obligations: parsed.obligations || [],
+            emergencyEvents: parsed.emergencyEvents || [],
+            announcements: parsed.announcements || initialAppState.announcements,
+            auditLogs: parsed.auditLogs || initialAppState.auditLogs,
+          };
         }
       }
     } catch (e) {
@@ -142,10 +209,146 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setCurrentRole = (role: UserRole) => {
     setCurrentRoleState(role);
-    localStorage.setItem(ROLE_STORAGE_KEY, role);
   };
 
-  // Recompute summaries authoritatively
+  // Admin Auth Handlers
+  const isPasswordConfigured = Boolean(state.settings.adminPasswordConfigured && state.settings.adminPin);
+
+  const adminLogin = (password: string): boolean => {
+    // If not yet configured, login directly is not permitted until owner sets password
+    if (!isPasswordConfigured) {
+      return false;
+    }
+    const cleanInput = (password || '').trim();
+    const storedPassword = (state.settings.adminPin || '').trim();
+    if (cleanInput && cleanInput === storedPassword) {
+      setIsAdmin(true);
+      localStorage.setItem(AUTH_STORAGE_KEY, 'true');
+      return true;
+    }
+    return false;
+  };
+
+  const adminLogout = () => {
+    setIsAdmin(false);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  };
+
+  const setupInitialAdminPassword = (password: string, question?: string, answer?: string) => {
+    const cleanPassword = (password || '').trim();
+    if (!cleanPassword || cleanPassword.length < 4) {
+      return { success: false, message: 'Password must be at least 4 characters long.' };
+    }
+
+    setState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        adminPin: cleanPassword,
+        adminPasswordConfigured: true,
+        securityQuestion: question || prev.settings.securityQuestion || 'What is the registered city of the Anjuman?',
+        securityAnswer: (answer || prev.settings.securityAnswer || 'Karachi').trim(),
+        recoverySecretKey: prev.settings.recoverySecretKey || 'AFB-RECOVER-2026',
+      },
+    }));
+
+    setIsAdmin(true);
+    localStorage.setItem(AUTH_STORAGE_KEY, 'true');
+
+    return {
+      success: true,
+      message: 'Administrator password configured successfully! Full editing privileges activated.',
+    };
+  };
+
+  const updateAdminPin = (oldPin: string, newPin: string, question?: string, answer?: string) => {
+    const currentPin = (state.settings.adminPin || '').trim();
+    const cleanOld = (oldPin || '').trim();
+    const cleanNew = (newPin || '').trim();
+
+    // If password was already configured, require old password to match
+    if (state.settings.adminPasswordConfigured && currentPin && cleanOld !== currentPin) {
+      return { success: false, message: 'Current password is incorrect.' };
+    }
+    if (!cleanNew || cleanNew.length < 4) {
+      return { success: false, message: 'New password must be at least 4 characters long.' };
+    }
+
+    setState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        adminPin: cleanNew,
+        adminPasswordConfigured: true,
+        securityQuestion: question || prev.settings.securityQuestion,
+        securityAnswer: answer !== undefined ? answer.trim() : prev.settings.securityAnswer,
+      },
+    }));
+
+    return { success: true, message: 'Administrator password updated successfully.' };
+  };
+
+  const recoverAdminPassword = (answerOrKey: string, newPassword: string) => {
+    const cleanInput = (answerOrKey || '').trim().toLowerCase();
+    const cleanKeyInput = (answerOrKey || '').trim().toUpperCase();
+    const cleanPhoneInput = (answerOrKey || '').replace(/[-\s]/g, '');
+
+    const storedAnswer = (state.settings.securityAnswer || 'karachi').trim().toLowerCase();
+    const storedSecretKey = (state.settings.recoverySecretKey || 'AFB-RECOVER-2026').trim().toUpperCase();
+    const storedPhone = (state.settings.phone || '0300-5551234').replace(/[-\s]/g, '');
+
+    const isMatch =
+      cleanInput === storedAnswer ||
+      cleanKeyInput === storedSecretKey ||
+      (cleanPhoneInput.length >= 7 && cleanPhoneInput === storedPhone);
+
+    if (!isMatch) {
+      return {
+        success: false,
+        message: 'Recovery details do not match our records. Please verify the security answer, emergency recovery key, or registered phone number.',
+      };
+    }
+
+    const cleanNewPassword = (newPassword || '').trim();
+    if (!cleanNewPassword || cleanNewPassword.length < 4) {
+      return {
+        success: false,
+        message: 'New password must be at least 4 characters long.',
+      };
+    }
+
+    setState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        adminPin: cleanNewPassword,
+        adminPasswordConfigured: true,
+      },
+    }));
+
+    setIsAdmin(true);
+    localStorage.setItem(AUTH_STORAGE_KEY, 'true');
+
+    return {
+      success: true,
+      message: 'Password successfully recovered and updated! Administrator session unlocked.',
+    };
+  };
+
+  const resetAdminToSetupMode = () => {
+    setState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        adminPin: '',
+        adminPasswordConfigured: false,
+      },
+    }));
+    setIsAdmin(false);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  };
+
+  // Recompute summaries authoritatively from database records
   const accountingSummary = useMemo(() => {
     return computeAccountingSummary(state);
   }, [state]);
@@ -161,7 +364,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newLog = {
       id: `AUDIT-${Date.now()}`,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      user: currentRole === 'super_admin' ? 'Admin' : currentRole,
+      user: isAdmin ? 'Admin' : 'User',
       action,
       details,
       entityType,
@@ -170,7 +373,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newLog;
   };
 
-  // 1. Add Member
+  // 1. CLEAN ALL FINANCIAL RECORDS (User Requirement Section 1)
+  const cleanAllFinancialRecords = useCallback(() => {
+    const audit = addAuditLog(
+      'CLEAN_FINANCIAL_RECORDS',
+      'All payments, expenses, incomes, obligations, and sample financial records were permanently removed. All financial totals reset to zero.',
+      'System',
+      'FINANCE'
+    );
+
+    setState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        openingCashBalance: 0,
+      },
+      payments: [],
+      expenses: [],
+      incomes: [],
+      obligations: [],
+      emergencyEvents: [],
+      auditLogs: [audit, ...prev.auditLogs],
+    }));
+  }, [isAdmin]);
+
+  // 2. MEMBER CRUD
   const addMember = useCallback((data: {
     fullName: string;
     fatherName: string;
@@ -178,14 +405,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     address: string;
     joiningDate: string;
     notes?: string;
-    initialPaymentReceived?: number;
-    paymentMethod?: PaymentMethod;
   }) => {
-    const joiningMonth = data.joiningDate.substring(0, 7); // YYYY-MM
+    const joiningMonth = data.joiningDate.substring(0, 7);
     const existingIds = state.members.map(m => m.id);
     const memberId = generateNextMemberId(existingIds);
-
     const now = new Date().toISOString();
+
     const newMember: Member = {
       id: memberId,
       fullName: data.fullName.trim(),
@@ -201,90 +426,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatedAt: now,
     };
 
-    // Obligation 1: Registration Fee
-    const regFeeAmount = state.settings.registrationFee || 100;
-    const regObl: FeeObligation = {
-      id: `OBL-REG-${memberId}`,
-      memberId,
-      type: 'registration',
-      title: 'Registration Fee (داخلہ فیس)',
-      amountDue: regFeeAmount,
-      amountPaid: 0,
-      status: 'unpaid',
-      createdAt: now,
-      dueDate: data.joiningDate,
-    };
-
-    // Obligation 2: First Month Fee
-    const firstMonthFeeAmount = state.settings.newMemberFirstMonthFee || 100;
-    const firstMonthObl: FeeObligation = {
-      id: `OBL-MTH-${joiningMonth}-${memberId}`,
-      memberId,
-      type: 'monthly',
-      periodMonth: joiningMonth,
-      title: `Monthly Fee ${joiningMonth} (ماہانہ فیس)`,
-      amountDue: firstMonthFeeAmount,
-      amountPaid: 0,
-      status: 'unpaid',
-      createdAt: now,
-      dueDate: `${joiningMonth}-15`,
-    };
-
-    let newPayment: PaymentRecord | null = null;
-    const initialPaid = Math.max(0, Math.round(data.initialPaymentReceived || 0));
-
-    if (initialPaid > 0) {
-      // Allocate payment: up to regFeeAmount to registration, remainder to first month
-      let regAlloc = Math.min(initialPaid, regFeeAmount);
-      let monthAlloc = Math.min(initialPaid - regAlloc, firstMonthFeeAmount);
-
-      regObl.amountPaid = regAlloc;
-      regObl.status = regAlloc >= regFeeAmount ? 'paid' : (regAlloc > 0 ? 'partial' : 'unpaid');
-
-      firstMonthObl.amountPaid = monthAlloc;
-      firstMonthObl.status = monthAlloc >= firstMonthFeeAmount ? 'paid' : (monthAlloc > 0 ? 'partial' : 'unpaid');
-
-      const year = new Date().getFullYear();
-      const receiptNo = generateReceiptNumber(year, state.payments.length, state.settings.receiptPrefix);
-      
-      const allocations: PaymentAllocation[] = [];
-      if (regAlloc > 0) {
-        allocations.push({
-          obligationId: regObl.id,
-          type: 'registration',
-          title: 'Registration Fee',
-          amount: regAlloc,
-        });
-      }
-      if (monthAlloc > 0) {
-        allocations.push({
-          obligationId: firstMonthObl.id,
-          type: 'monthly',
-          periodMonth: joiningMonth,
-          title: `Monthly Fee ${joiningMonth}`,
-          amount: monthAlloc,
-        });
-      }
-
-      newPayment = {
-        id: `PAY-${Date.now()}`,
-        receiptNumber: receiptNo,
-        memberId,
-        memberName: newMember.fullName,
-        date: data.joiningDate,
-        amountReceived: initialPaid,
-        paymentMethod: data.paymentMethod || 'cash',
-        notes: `Initial registration & joining fee payment for ${newMember.fullName}`,
-        recordedBy: currentRole,
-        allocations,
-        status: 'valid',
-        createdAt: now,
-      };
-    }
-
     const audit = addAuditLog(
-      'REGISTER_MEMBER',
-      `Registered member ${newMember.fullName} (${memberId}). Obligations: PKR ${regFeeAmount} (Reg) + PKR ${firstMonthFeeAmount} (First Month). Initial Paid: PKR ${initialPaid}.`,
+      'ADD_MEMBER',
+      `Registered member ${newMember.fullName} (${memberId})`,
       'Member',
       memberId
     );
@@ -292,291 +436,109 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setState(prev => ({
       ...prev,
       members: [...prev.members, newMember],
-      obligations: [...prev.obligations, regObl, firstMonthObl],
-      payments: newPayment ? [newPayment, ...prev.payments] : prev.payments,
       auditLogs: [audit, ...prev.auditLogs],
     }));
 
-    if (newPayment) {
-      setLatestReceipt(newPayment);
-    }
+    return newMember;
+  }, [state.members, isAdmin]);
 
-    return { member: newMember, receiptNumber: newPayment?.receiptNumber };
-  }, [state.members, state.settings, state.payments.length, currentRole]);
-
-  // 2. Update Member
   const updateMember = useCallback((id: string, updates: Partial<Member>) => {
     setState(prev => {
-      const updatedMembers = prev.members.map(m => (m.id === id ? { ...m, ...updates, updatedAt: new Date().toISOString() } : m));
-      const audit = addAuditLog('UPDATE_MEMBER', `Updated details for member ${id}`, 'Member', id);
+      const updatedMembers = prev.members.map(m => 
+        m.id === id ? { ...m, ...updates, updatedAt: new Date().toISOString() } : m
+      );
+      const audit = addAuditLog('UPDATE_MEMBER', `Updated member details for ${id}`, 'Member', id);
       return {
         ...prev,
         members: updatedMembers,
         auditLogs: [audit, ...prev.auditLogs],
       };
     });
-  }, [currentRole]);
+  }, [isAdmin]);
 
-  // 3. Archive Member
-  const archiveMember = useCallback((id: string, reason: string) => {
+  const deleteMember = useCallback((id: string) => {
     setState(prev => {
-      const updatedMembers = prev.members.map(m => (m.id === id ? { ...m, status: 'inactive' as const, notes: `${m.notes ? m.notes + ' | ' : ''}Archived: ${reason}` } : m));
-      const audit = addAuditLog('ARCHIVE_MEMBER', `Archived member ${id}. Reason: ${reason}. Historical fees strictly retained.`, 'Member', id);
+      const member = prev.members.find(m => m.id === id);
+      const updatedMembers = prev.members.filter(m => m.id !== id);
+      // Clean obligations associated with deleted member
+      const updatedObligations = prev.obligations.filter(o => o.memberId !== id);
+      const audit = addAuditLog('DELETE_MEMBER', `Deleted member ${member?.fullName || id} (${id})`, 'Member', id);
       return {
         ...prev,
         members: updatedMembers,
+        obligations: updatedObligations,
         auditLogs: [audit, ...prev.auditLogs],
       };
     });
-  }, [currentRole]);
+  }, [isAdmin]);
 
-  // 4. Generate Monthly Fees (Idempotent!)
-  const generateMonthlyFees = useCallback((month: string) => {
-    const feeAmount = state.settings.monthlyFee || 100;
-    const now = new Date().toISOString();
-    let createdCount = 0;
-    let skippedCount = 0;
-
-    const newObligations: FeeObligation[] = [];
-
-    // Filter eligible active members whose joiningMonth <= target month
-    for (const member of state.members) {
-      if (member.status !== 'active') {
-        skippedCount++;
-        continue;
-      }
-      if (member.joiningMonth > month) {
-        // Enforce Test J: Never automatically charge for months prior to joining month!
-        skippedCount++;
-        continue;
-      }
-
-      // Check if monthly obligation already exists (Enforce Test F: Duplicate Prevention)
-      const exists = state.obligations.some(
-        o => o.memberId === member.id && o.type === 'monthly' && o.periodMonth === month
-      );
-
-      if (exists) {
-        skippedCount++;
-        continue;
-      }
-
-      newObligations.push({
-        id: `OBL-MTH-${month}-${member.id}`,
-        memberId: member.id,
-        type: 'monthly',
-        periodMonth: month,
-        title: `Monthly Fee ${month} (ماہانہ فیس)`,
-        amountDue: feeAmount,
-        amountPaid: 0,
-        status: 'unpaid',
-        createdAt: now,
-        dueDate: `${month}-15`,
-      });
-      createdCount++;
-    }
-
-    if (createdCount > 0) {
-      const audit = addAuditLog(
-        'GENERATE_MONTHLY_FEES',
-        `Generated monthly fees of PKR ${feeAmount} for ${createdCount} active members for month ${month}. ${skippedCount} skipped (already generated or joined later).`,
-        'MonthlyFee',
-        month
-      );
-
-      setState(prev => ({
-        ...prev,
-        obligations: [...prev.obligations, ...newObligations],
-        auditLogs: [audit, ...prev.auditLogs],
-      }));
-    }
-
-    return { createdCount, skippedCount };
-  }, [state.members, state.obligations, state.settings.monthlyFee, currentRole]);
-
-  // 5. Bulk Monthly Fee Payment
-  const recordBulkMonthlyPayment = useCallback((
-    memberIds: string[],
-    month: string,
-    amountPerMember: number,
-    paymentMethod: PaymentMethod
-  ) => {
-    const now = new Date().toISOString();
-    const today = now.substring(0, 10);
-    const newPayments: PaymentRecord[] = [];
-    const updatedObligations = [...state.obligations];
-    let count = 0;
-
-    for (const mId of memberIds) {
-      const member = state.members.find(m => m.id === mId);
-      if (!member) continue;
-
-      // Find monthly obligation for this month
-      let oblIndex = updatedObligations.findIndex(
-        o => o.memberId === mId && o.type === 'monthly' && o.periodMonth === month
-      );
-
-      if (oblIndex === -1) {
-        // Create if missing
-        const newObl: FeeObligation = {
-          id: `OBL-MTH-${month}-${mId}`,
-          memberId: mId,
-          type: 'monthly',
-          periodMonth: month,
-          title: `Monthly Fee ${month} (ماہانہ فیس)`,
-          amountDue: amountPerMember,
-          amountPaid: 0,
-          status: 'unpaid',
-          createdAt: now,
-        };
-        updatedObligations.push(newObl);
-        oblIndex = updatedObligations.length - 1;
-      }
-
-      const targetObl = updatedObligations[oblIndex];
-      const remainingDue = Math.max(0, targetObl.amountDue - targetObl.amountPaid);
-      const payAmount = Math.min(amountPerMember, remainingDue > 0 ? remainingDue : amountPerMember);
-
-      targetObl.amountPaid += payAmount;
-      targetObl.status = targetObl.amountPaid >= targetObl.amountDue ? 'paid' : 'partial';
-
-      const year = new Date().getFullYear();
-      const receiptNo = generateReceiptNumber(year, state.payments.length + count, state.settings.receiptPrefix);
-
-      newPayments.push({
-        id: `PAY-BULK-${Date.now()}-${mId}`,
-        receiptNumber: receiptNo,
-        memberId: mId,
-        memberName: member.fullName,
-        date: today,
-        amountReceived: payAmount,
-        paymentMethod,
-        notes: `Bulk collection for ${month}`,
-        recordedBy: currentRole,
-        allocations: [{
-          obligationId: targetObl.id,
-          type: 'monthly',
-          periodMonth: month,
-          title: `Monthly Fee ${month}`,
-          amount: payAmount,
-        }],
-        status: 'valid',
-        createdAt: now,
-      });
-      count++;
-    }
-
-    const audit = addAuditLog(
-      'BULK_MONTHLY_PAYMENT',
-      `Recorded bulk monthly payment of PKR ${amountPerMember} each for ${count} members for month ${month}.`,
-      'Payment',
-      month
-    );
-
-    setState(prev => ({
-      ...prev,
-      obligations: updatedObligations,
-      payments: [...newPayments, ...prev.payments],
-      auditLogs: [audit, ...prev.auditLogs],
-    }));
-
-    return { paymentCount: count };
-  }, [state.members, state.obligations, state.payments.length, state.settings.receiptPrefix, currentRole]);
-
-  // 6. Create Emergency Event & Obligations
-  const createEmergencyEvent = useCallback((eventData: {
-    deceasedName: string;
-    deceasedRelation?: string;
-    dateOfDeath: string;
-    description: string;
-    feePerMember?: number;
-    notes?: string;
-    funeralExpenseAmount?: number;
-    funeralExpensePaidTo?: string;
-  }) => {
-    const feeRate = eventData.feePerMember || state.settings.emergencyFee || 100;
-    const year = new Date().getFullYear();
-    const eventId = `EMG-${year}-${String(state.emergencyEvents.length + 1).padStart(3, '0')}`;
-    const now = new Date().toISOString();
-
-    // Eligible active members (exclude deceased)
-    const eligibleMembers = state.members.filter(m => m.status === 'active');
-    const eligibleCount = eligibleMembers.length;
-    const totalDue = feeRate * eligibleCount;
-
-    const newObligations: FeeObligation[] = eligibleMembers.map(m => ({
-      id: `OBL-EMG-${eventId}-${m.id}`,
-      memberId: m.id,
-      type: 'emergency',
-      emergencyEventId: eventId,
-      title: `Emergency Death Fund: ${eventData.deceasedName} (کفن دفن فنڈ)`,
-      amountDue: feeRate,
-      amountPaid: 0,
-      status: 'unpaid',
-      createdAt: now,
-    }));
-
-    const newExpenses: ExpenseRecord[] = [];
-    if (eventData.funeralExpenseAmount && eventData.funeralExpenseAmount > 0) {
-      newExpenses.push({
-        id: `EXP-${year}-${String(state.expenses.length + 1).padStart(3, '0')}`,
-        date: eventData.dateOfDeath,
-        category: 'Funeral transport / ambulance',
-        description: `Funeral and Kafan-Dafan relief assistance for ${eventData.deceasedName}`,
-        amount: Math.round(eventData.funeralExpenseAmount),
-        paymentMethod: 'cash',
-        paidTo: eventData.funeralExpensePaidTo || `Family of ${eventData.deceasedName}`,
-        voucherNumber: `EMG-VOUCH-${eventId}`,
-        notes: `Sanctioned death welfare relief linked to event ${eventId}`,
-        emergencyEventId: eventId,
-        createdBy: currentRole,
-        createdAt: now,
-        lastModified: now,
-        status: 'valid',
-      });
-    }
-
-    const newEvent: EmergencyEvent = {
-      id: eventId,
-      deceasedName: eventData.deceasedName.trim(),
-      deceasedRelation: eventData.deceasedRelation?.trim() || '',
-      dateOfDeath: eventData.dateOfDeath,
-      description: eventData.description.trim(),
-      feePerMember: feeRate,
-      eligibleMemberCount: eligibleCount,
-      totalDue,
-      totalCollected: 0,
-      relatedExpenseIds: newExpenses.map(e => e.id),
-      notes: eventData.notes || '',
-      createdAt: now,
+  // 3. OFFICE BEARERS CRUD
+  const addOfficeBearer = useCallback((data: Omit<OfficeBearer, 'id'>) => {
+    const id = `OB-${Date.now()}`;
+    const newBearer: OfficeBearer = {
+      ...data,
+      id,
     };
 
-    const audit = addAuditLog(
-      'CREATE_EMERGENCY_EVENT',
-      `Recorded death event for ${newEvent.deceasedName} (${eventId}). Created obligations of PKR ${feeRate} each for ${eligibleCount} members (Total PKR ${totalDue}).`,
-      'EmergencyEvent',
-      eventId
-    );
+    setState(prev => {
+      const existing = prev.settings.officeBearers || [];
+      const updated = [...existing, newBearer];
+      const audit = addAuditLog('ADD_OFFICE_BEARER', `Added office bearer ${newBearer.name} (${newBearer.role})`, 'OfficeBearer', id);
+      return {
+        ...prev,
+        settings: {
+          ...prev.settings,
+          officeBearers: updated,
+        },
+        auditLogs: [audit, ...prev.auditLogs],
+      };
+    });
 
-    setState(prev => ({
-      ...prev,
-      emergencyEvents: [newEvent, ...prev.emergencyEvents],
-      obligations: [...prev.obligations, ...newObligations],
-      expenses: newExpenses.length > 0 ? [...newExpenses, ...prev.expenses] : prev.expenses,
-      auditLogs: [audit, ...prev.auditLogs],
-    }));
+    return newBearer;
+  }, [isAdmin]);
 
-    return newEvent;
-  }, [state.emergencyEvents.length, state.members, state.expenses.length, state.settings.emergencyFee, currentRole]);
+  const updateOfficeBearer = useCallback((id: string, updates: Partial<OfficeBearer>) => {
+    setState(prev => {
+      const existing = prev.settings.officeBearers || [];
+      const updated = existing.map(b => b.id === id ? { ...b, ...updates } : b);
+      const audit = addAuditLog('UPDATE_OFFICE_BEARER', `Updated office bearer ${id}`, 'OfficeBearer', id);
+      return {
+        ...prev,
+        settings: {
+          ...prev.settings,
+          officeBearers: updated,
+        },
+        auditLogs: [audit, ...prev.auditLogs],
+      };
+    });
+  }, [isAdmin]);
 
-  // 7. Record Payment & Smart Allocation
-  const recordPayment = useCallback((data: {
+  const deleteOfficeBearer = useCallback((id: string) => {
+    setState(prev => {
+      const existing = prev.settings.officeBearers || [];
+      const bearer = existing.find(b => b.id === id);
+      const updated = existing.filter(b => b.id !== id);
+      const audit = addAuditLog('DELETE_OFFICE_BEARER', `Removed office bearer ${bearer?.name || id}`, 'OfficeBearer', id);
+      return {
+        ...prev,
+        settings: {
+          ...prev.settings,
+          officeBearers: updated,
+        },
+        auditLogs: [audit, ...prev.auditLogs],
+      };
+    });
+  }, [isAdmin]);
+
+  // 4. PAYMENTS CRUD
+  const addPayment = useCallback((data: {
     memberId: string;
     amountReceived: number;
-    paymentDate: string;
+    paymentCategory: PaymentCategory;
     paymentMethod: PaymentMethod;
+    date: string;
+    relevantPeriod?: string;
     notes?: string;
-    allocations: PaymentAllocation[];
   }) => {
     const member = state.members.find(m => m.id === data.memberId);
     if (!member) throw new Error('Member not found');
@@ -585,182 +547,247 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const receiptNo = generateReceiptNumber(year, state.payments.length, state.settings.receiptPrefix);
     const now = new Date().toISOString();
 
-    // Verify allocations sum matches amountReceived exactly (Enforce Test E & anti-tamper)
-    const allocSum = data.allocations.reduce((sum, a) => sum + Math.round(a.amount), 0);
-    if (allocSum !== Math.round(data.amountReceived)) {
-      throw new Error(`Allocations sum (PKR ${allocSum}) does not match amount received (PKR ${data.amountReceived})`);
-    }
-
-    // Apply allocations to obligations
-    const updatedObligations = [...state.obligations];
-    for (const alloc of data.allocations) {
-      const idx = updatedObligations.findIndex(o => o.id === alloc.obligationId);
-      if (idx !== -1) {
-        const obl = updatedObligations[idx];
-        obl.amountPaid = Math.round(obl.amountPaid + alloc.amount);
-        obl.status = obl.amountPaid >= obl.amountDue ? 'paid' : (obl.amountPaid > 0 ? 'partial' : 'unpaid');
-      }
-    }
-
-    // Also update emergencyEvent totalCollected if emergency allocations occurred
-    const updatedEmergencyEvents = [...state.emergencyEvents];
-    for (const alloc of data.allocations) {
-      if (alloc.type === 'emergency' && alloc.emergencyEventId) {
-        const evIdx = updatedEmergencyEvents.findIndex(e => e.id === alloc.emergencyEventId);
-        if (evIdx !== -1) {
-          updatedEmergencyEvents[evIdx].totalCollected += Math.round(alloc.amount);
-        }
-      }
-    }
-
     const newPayment: PaymentRecord = {
       id: `PAY-${Date.now()}`,
       receiptNumber: receiptNo,
       memberId: member.id,
       memberName: member.fullName,
-      date: data.paymentDate,
+      date: data.date,
       amountReceived: Math.round(data.amountReceived),
+      paymentCategory: data.paymentCategory,
       paymentMethod: data.paymentMethod,
+      relevantPeriod: data.relevantPeriod || data.date.substring(0, 7),
       notes: data.notes || '',
-      recordedBy: currentRole,
-      allocations: data.allocations,
+      recordedBy: isAdmin ? 'Admin' : 'Treasurer',
+      allocations: [
+        {
+          type: (data.paymentCategory === 'monthly' ? 'monthly' : data.paymentCategory === 'emergency' ? 'emergency' : 'registration') as any,
+          periodMonth: data.relevantPeriod,
+          title: `${data.paymentCategory.toUpperCase()} Fee Payment`,
+          amount: Math.round(data.amountReceived),
+        }
+      ],
       status: 'valid',
       createdAt: now,
+      updatedAt: now,
     };
 
     const audit = addAuditLog(
       'RECORD_PAYMENT',
-      `Collected PKR ${newPayment.amountReceived} from ${member.fullName} (${member.id}) under Receipt #${receiptNo}.`,
+      `Recorded payment of Rs. ${newPayment.amountReceived} from ${member.fullName} (${member.id}) under Receipt #${receiptNo} [Category: ${data.paymentCategory}].`,
       'Payment',
       newPayment.id
     );
 
     setState(prev => ({
       ...prev,
-      obligations: updatedObligations,
-      emergencyEvents: updatedEmergencyEvents,
       payments: [newPayment, ...prev.payments],
       auditLogs: [audit, ...prev.auditLogs],
     }));
 
     setLatestReceipt(newPayment);
     return newPayment;
-  }, [state.members, state.payments.length, state.settings.receiptPrefix, state.obligations, state.emergencyEvents, currentRole]);
+  }, [state.members, state.payments.length, state.settings.receiptPrefix, isAdmin]);
 
-  // 8. Reverse Payment (Auditable process)
-  const reversePayment = useCallback((paymentId: string, reason: string) => {
+  const updatePayment = useCallback((id: string, updates: Partial<PaymentRecord>) => {
     setState(prev => {
-      const payment = prev.payments.find(p => p.id === paymentId);
-      if (!payment || payment.status === 'reversed') return prev;
-
-      // Roll back allocations from obligations
-      const updatedObligations = prev.obligations.map(obl => {
-        const alloc = payment.allocations.find(a => a.obligationId === obl.id);
-        if (alloc) {
-          const newPaid = Math.max(0, obl.amountPaid - alloc.amount);
-          return {
-            ...obl,
-            amountPaid: newPaid,
-            status: (newPaid >= obl.amountDue ? 'paid' : (newPaid > 0 ? 'partial' : 'unpaid')) as FeeObligation['status'],
-          };
-        }
-        return obl;
-      });
-
-      const updatedPayments = prev.payments.map(p => {
-        if (p.id === paymentId) {
-          return {
-            ...p,
-            status: 'reversed' as const,
-            reversedAt: new Date().toISOString(),
-            reversalReason: reason,
-          };
-        }
-        return p;
-      });
-
-      const audit = addAuditLog(
-        'REVERSE_PAYMENT',
-        `Reversed payment #${payment.receiptNumber} (PKR ${payment.amountReceived}) for ${payment.memberName}. Reason: ${reason}`,
-        'Payment',
-        paymentId
+      const now = new Date().toISOString();
+      const updatedPayments = prev.payments.map(p => 
+        p.id === id ? { ...p, ...updates, updatedAt: now } : p
       );
-
+      const audit = addAuditLog('UPDATE_PAYMENT', `Edited payment record ${id}`, 'Payment', id);
       return {
         ...prev,
-        obligations: updatedObligations,
         payments: updatedPayments,
         auditLogs: [audit, ...prev.auditLogs],
       };
     });
-  }, [currentRole]);
+  }, [isAdmin]);
 
-  // 9. Add General Income
-  const addIncome = useCallback((incomeData: Omit<IncomeRecord, 'id' | 'createdAt' | 'status' | 'recordedBy'>) => {
-    const year = new Date().getFullYear();
-    const id = `INC-${year}-${String(state.incomes.length + 1).padStart(3, '0')}`;
-    const now = new Date().toISOString();
-
-    const newIncome: IncomeRecord = {
-      ...incomeData,
-      id,
-      amount: Math.round(incomeData.amount),
-      recordedBy: currentRole,
-      status: 'valid',
-      createdAt: now,
-    };
-
-    const audit = addAuditLog(
-      'RECORD_INCOME',
-      `Recorded income PKR ${newIncome.amount} from ${newIncome.receivedFrom} (${newIncome.category}).`,
-      'Income',
-      id
-    );
-
-    setState(prev => ({
-      ...prev,
-      incomes: [newIncome, ...prev.incomes],
-      auditLogs: [audit, ...prev.auditLogs],
-    }));
-
-    return newIncome;
-  }, [state.incomes.length, currentRole]);
-
-  // 10. Reverse Income
-  const reverseIncome = useCallback((incomeId: string, reason: string) => {
+  const deletePayment = useCallback((id: string) => {
     setState(prev => {
-      const updatedIncomes = prev.incomes.map(i => {
-        if (i.id === incomeId) {
-          return {
-            ...i,
-            status: 'reversed' as const,
-            reversedAt: new Date().toISOString(),
-            reversalReason: reason,
-          };
-        }
-        return i;
-      });
-
-      const audit = addAuditLog('REVERSE_INCOME', `Reversed income ID ${incomeId}. Reason: ${reason}`, 'Income', incomeId);
+      const pay = prev.payments.find(p => p.id === id);
+      const updatedPayments = prev.payments.filter(p => p.id !== id);
+      const audit = addAuditLog('DELETE_PAYMENT', `Deleted payment #${pay?.receiptNumber || id} (Rs. ${pay?.amountReceived})`, 'Payment', id);
       return {
         ...prev,
-        incomes: updatedIncomes,
+        payments: updatedPayments,
         auditLogs: [audit, ...prev.auditLogs],
       };
     });
-  }, [currentRole]);
+  }, [isAdmin]);
 
-  // 11. Add Expense
-  const addExpense = useCallback((expenseData: Omit<ExpenseRecord, 'id' | 'createdAt' | 'lastModified' | 'status' | 'createdBy'>) => {
+  // 4b. MONTHLY FEES GENERATION & BULK PAYMENT
+  const generateMonthlyFees = useCallback((targetMonth: string) => {
+    const feeRate = state.settings.monthlyFee || 100;
+    const eligibleMembers = state.members.filter(
+      m => m.status === 'active' && m.joiningMonth <= targetMonth
+    );
+
+    let createdCount = 0;
+    let skippedCount = 0;
+    const newObligations: FeeObligation[] = [];
+
+    for (const mem of eligibleMembers) {
+      const alreadyExists = state.obligations.some(
+        o => o.memberId === mem.id && o.type === 'monthly' && o.periodMonth === targetMonth
+      );
+      if (alreadyExists) {
+        skippedCount++;
+      } else {
+        const oblId = `OBL-M-${mem.id}-${targetMonth}`;
+        newObligations.push({
+          id: oblId,
+          memberId: mem.id,
+          type: 'monthly',
+          periodMonth: targetMonth,
+          title: `Monthly Fee - ${targetMonth}`,
+          amountDue: feeRate,
+          amountPaid: 0,
+          status: 'unpaid',
+          createdAt: new Date().toISOString(),
+          dueDate: `${targetMonth}-28`,
+        });
+        createdCount++;
+      }
+    }
+
+    if (newObligations.length > 0) {
+      setState(prev => ({
+        ...prev,
+        obligations: [...prev.obligations, ...newObligations],
+        auditLogs: [
+          addAuditLog('GENERATE_MONTHLY_FEES', `Generated monthly fees for ${createdCount} active members for period ${targetMonth}`, 'FeeObligation', targetMonth),
+          ...prev.auditLogs,
+        ],
+      }));
+    }
+
+    return { createdCount, skippedCount };
+  }, [state.members, state.obligations, state.settings.monthlyFee, isAdmin]);
+
+  const recordBulkMonthlyPayment = useCallback((
+    arg1: string[] | { memberIds: string[]; month: string; amountPerMember: number; paymentMethod: PaymentMethod; notes?: string },
+    argMonth?: string,
+    argAmount?: number,
+    argMethod?: PaymentMethod,
+    argNotes?: string
+  ) => {
+    let memberIds: string[];
+    let month: string;
+    let amountPerMember: number;
+    let paymentMethod: PaymentMethod;
+    let notes: string | undefined;
+
+    if (Array.isArray(arg1)) {
+      memberIds = arg1;
+      month = argMonth || new Date().toISOString().substring(0, 7);
+      amountPerMember = argAmount || state.settings.monthlyFee || 100;
+      paymentMethod = argMethod || 'cash';
+      notes = argNotes;
+    } else {
+      memberIds = arg1.memberIds;
+      month = arg1.month;
+      amountPerMember = arg1.amountPerMember;
+      paymentMethod = arg1.paymentMethod;
+      notes = arg1.notes;
+    }
+
+    const year = new Date().getFullYear();
+    const now = new Date().toISOString();
+    const newPayments: PaymentRecord[] = [];
+    const updatedObligations = [...state.obligations];
+
+    memberIds.forEach((memId, idx) => {
+      const member = state.members.find(m => m.id === memId);
+      if (!member) return;
+
+      const receiptNo = generateReceiptNumber(year, state.payments.length + idx, state.settings.receiptPrefix);
+      const paymentId = `PAY-${Date.now()}-${idx}`;
+
+      let obl = updatedObligations.find(
+        o => o.memberId === memId && o.type === 'monthly' && o.periodMonth === month
+      );
+
+      if (!obl) {
+        obl = {
+          id: `OBL-M-${memId}-${month}`,
+          memberId: memId,
+          type: 'monthly',
+          periodMonth: month,
+          title: `Monthly Fee - ${month}`,
+          amountDue: amountPerMember,
+          amountPaid: amountPerMember,
+          status: 'paid',
+          createdAt: now,
+        };
+        updatedObligations.push(obl);
+      } else {
+        obl.amountPaid += amountPerMember;
+        obl.status = obl.amountPaid >= obl.amountDue ? 'paid' : 'partial';
+      }
+
+      const payment: PaymentRecord = {
+        id: paymentId,
+        receiptNumber: receiptNo,
+        memberId: memId,
+        memberName: member.fullName,
+        date: new Date().toISOString().substring(0, 10),
+        amountReceived: amountPerMember,
+        paymentCategory: 'monthly',
+        paymentMethod: paymentMethod,
+        relevantPeriod: month,
+        notes: notes || `Bulk monthly fee collection for ${month}`,
+        recordedBy: isAdmin ? 'Admin' : 'Treasurer',
+        allocations: [
+          {
+            obligationId: obl.id,
+            type: 'monthly',
+            periodMonth: month,
+            title: `Monthly Fee ${month}`,
+            amount: amountPerMember,
+          }
+        ],
+        status: 'valid',
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      newPayments.push(payment);
+    });
+
+    if (newPayments.length > 0) {
+      const audit = addAuditLog(
+        'RECORD_BULK_PAYMENT',
+        `Bulk collected monthly fees for ${newPayments.length} members for month ${month}. Total: Rs. ${memberIds.length * amountPerMember}`,
+        'Payment',
+        month
+      );
+
+      setState(prev => ({
+        ...prev,
+        payments: [...newPayments, ...prev.payments],
+        obligations: updatedObligations,
+        auditLogs: [audit, ...prev.auditLogs],
+      }));
+
+      setLatestReceipt(newPayments[newPayments.length - 1]);
+    }
+
+    return { paymentCount: newPayments.length, receiptsCount: newPayments.length };
+  }, [state.members, state.obligations, state.payments.length, state.settings.monthlyFee, state.settings.receiptPrefix, isAdmin]);
+
+  // 5. EXPENSES CRUD
+  const addExpense = useCallback((data: Omit<ExpenseRecord, 'id' | 'createdAt' | 'lastModified' | 'status' | 'createdBy'>) => {
     const year = new Date().getFullYear();
     const id = `EXP-${year}-${String(state.expenses.length + 1).padStart(3, '0')}`;
     const now = new Date().toISOString();
 
     const newExpense: ExpenseRecord = {
-      ...expenseData,
+      ...data,
       id,
-      amount: Math.round(expenseData.amount),
-      createdBy: currentRole,
+      amount: Math.round(data.amount),
+      createdBy: isAdmin ? 'Admin' : 'Treasurer',
       createdAt: now,
       lastModified: now,
       status: 'valid',
@@ -768,7 +795,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const audit = addAuditLog(
       'RECORD_EXPENSE',
-      `Recorded expense PKR ${newExpense.amount} to ${newExpense.paidTo} (${newExpense.category}).`,
+      `Recorded expense Rs. ${newExpense.amount} to ${newExpense.paidTo} (${newExpense.category}).`,
       'Expense',
       id
     );
@@ -780,13 +807,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     return newExpense;
-  }, [state.expenses.length, currentRole]);
+  }, [state.expenses.length, isAdmin]);
 
-  // 12. Update Expense
   const updateExpense = useCallback((id: string, updates: Partial<ExpenseRecord>) => {
     setState(prev => {
       const now = new Date().toISOString();
-      const updatedExpenses = prev.expenses.map(e => (e.id === id ? { ...e, ...updates, lastModified: now } : e));
+      const updatedExpenses = prev.expenses.map(e => 
+        e.id === id ? { ...e, ...updates, lastModified: now } : e
+      );
       const audit = addAuditLog('UPDATE_EXPENSE', `Updated expense record ${id}`, 'Expense', id);
       return {
         ...prev,
@@ -794,34 +822,234 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         auditLogs: [audit, ...prev.auditLogs],
       };
     });
-  }, [currentRole]);
+  }, [isAdmin]);
 
-  // 13. Reverse Expense (Enforces Test I)
-  const reverseExpense = useCallback((expenseId: string, reason: string) => {
+  const deleteExpense = useCallback((id: string) => {
     setState(prev => {
-      const updatedExpenses = prev.expenses.map(e => {
-        if (e.id === expenseId) {
-          return {
-            ...e,
-            status: 'reversed' as const,
-            reversedAt: new Date().toISOString(),
-            reversalReason: reason,
-            lastModified: new Date().toISOString(),
-          };
-        }
-        return e;
-      });
-
-      const audit = addAuditLog('REVERSE_EXPENSE', `Reversed expense ID ${expenseId}. Reason: ${reason}`, 'Expense', expenseId);
+      const exp = prev.expenses.find(e => e.id === id);
+      const updatedExpenses = prev.expenses.filter(e => e.id !== id);
+      const audit = addAuditLog('DELETE_EXPENSE', `Deleted expense record ${id} (Rs. ${exp?.amount})`, 'Expense', id);
       return {
         ...prev,
         expenses: updatedExpenses,
         auditLogs: [audit, ...prev.auditLogs],
       };
     });
-  }, [currentRole]);
+  }, [isAdmin]);
 
-  // 14. Update Settings
+  // 6. INCOMES / DONATIONS CRUD
+  const addIncome = useCallback((data: Omit<IncomeRecord, 'id' | 'createdAt' | 'status' | 'recordedBy'>) => {
+    const year = new Date().getFullYear();
+    const id = `INC-${year}-${String(state.incomes.length + 1).padStart(3, '0')}`;
+    const now = new Date().toISOString();
+
+    const newIncome: IncomeRecord = {
+      ...data,
+      id,
+      amount: Math.round(data.amount),
+      recordedBy: isAdmin ? 'Admin' : 'Treasurer',
+      status: 'valid',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const audit = addAuditLog(
+      'RECORD_INCOME',
+      `Recorded donation/income of Rs. ${newIncome.amount} from ${newIncome.receivedFrom} (${newIncome.category}).`,
+      'Income',
+      id
+    );
+
+    setState(prev => ({
+      ...prev,
+      incomes: [newIncome, ...prev.incomes],
+      auditLogs: [audit, ...prev.auditLogs],
+    }));
+
+    return newIncome;
+  }, [state.incomes.length, isAdmin]);
+
+  const updateIncome = useCallback((id: string, updates: Partial<IncomeRecord>) => {
+    setState(prev => {
+      const updatedIncomes = prev.incomes.map(i => 
+        i.id === id ? { ...i, ...updates, updatedAt: new Date().toISOString() } : i
+      );
+      const audit = addAuditLog('UPDATE_INCOME', `Updated income record ${id}`, 'Income', id);
+      return {
+        ...prev,
+        incomes: updatedIncomes,
+        auditLogs: [audit, ...prev.auditLogs],
+      };
+    });
+  }, [isAdmin]);
+
+  const deleteIncome = useCallback((id: string) => {
+    setState(prev => {
+      const inc = prev.incomes.find(i => i.id === id);
+      const updatedIncomes = prev.incomes.filter(i => i.id !== id);
+      const audit = addAuditLog('DELETE_INCOME', `Deleted income record ${id} (Rs. ${inc?.amount})`, 'Income', id);
+      return {
+        ...prev,
+        incomes: updatedIncomes,
+        auditLogs: [audit, ...prev.auditLogs],
+      };
+    });
+  }, [isAdmin]);
+
+  // 7. EMERGENCY EVENTS CRUD
+  const createEmergencyEvent = useCallback((data: {
+    deceasedName: string;
+    deceasedRelation?: string;
+    dateOfDeath: string;
+    description: string;
+    feePerMember?: number;
+    funeralExpenseAmount?: number;
+    funeralExpensePaidTo?: string;
+    notes?: string;
+  }) => {
+    const feeRate = data.feePerMember || state.settings.emergencyFee || 100;
+    const year = new Date().getFullYear();
+    const eventId = `EMG-${year}-${String(state.emergencyEvents.length + 1).padStart(3, '0')}`;
+    const now = new Date().toISOString();
+    const eligibleMembers = state.members.filter(m => m.status === 'active');
+    const eligibleCount = eligibleMembers.length;
+
+    const newEvent: EmergencyEvent = {
+      id: eventId,
+      deceasedName: data.deceasedName.trim(),
+      deceasedRelation: data.deceasedRelation?.trim() || '',
+      dateOfDeath: data.dateOfDeath,
+      description: data.description.trim(),
+      feePerMember: feeRate,
+      eligibleMemberCount: eligibleCount,
+      totalDue: feeRate * eligibleCount,
+      totalCollected: 0,
+      relatedExpenseIds: [],
+      notes: data.notes || '',
+      createdAt: now,
+    };
+
+    // Generate emergency fee obligations for all active members
+    const newObligations: FeeObligation[] = eligibleMembers.map(m => ({
+      id: `OBL-E-${m.id}-${eventId}`,
+      memberId: m.id,
+      type: 'emergency',
+      emergencyEventId: eventId,
+      title: `Emergency Death Fund: ${data.deceasedName}`,
+      amountDue: feeRate,
+      amountPaid: 0,
+      status: 'unpaid',
+      createdAt: now,
+    }));
+
+    // Optional funeral assistance expense record
+    const newExpenses: ExpenseRecord[] = [];
+    if (data.funeralExpenseAmount && data.funeralExpenseAmount > 0) {
+      const expId = `EXP-${year}-${String(state.expenses.length + 1).padStart(3, '0')}`;
+      newExpenses.push({
+        id: expId,
+        title: `Funeral Aid / Kafan Dafan: ${data.deceasedName}`,
+        date: data.dateOfDeath,
+        category: 'Funeral transport / ambulance',
+        description: `Emergency financial assistance & funeral arrangements for late ${data.deceasedName} (${data.deceasedRelation || 'Community Member'})`,
+        amount: Math.round(data.funeralExpenseAmount),
+        paymentMethod: 'cash',
+        paidTo: data.funeralExpensePaidTo || 'Bereaved Family / Kafan Committee',
+        voucherNumber: `EMG-VCH-${eventId}`,
+        receiptAttachment: '',
+        notes: `Linked to death event ${eventId}`,
+        createdBy: isAdmin ? 'Admin' : 'Treasurer',
+        createdAt: now,
+        lastModified: now,
+        status: 'valid',
+      });
+      newEvent.relatedExpenseIds.push(expId);
+    }
+
+    const audit = addAuditLog(
+      'CREATE_EMERGENCY_EVENT',
+      `Recorded death/emergency case for ${newEvent.deceasedName} (${eventId}). Fee: Rs. ${feeRate} for ${eligibleCount} members.`,
+      'EmergencyEvent',
+      eventId
+    );
+
+    setState(prev => ({
+      ...prev,
+      emergencyEvents: [newEvent, ...prev.emergencyEvents],
+      obligations: [...prev.obligations, ...newObligations],
+      expenses: [...newExpenses, ...prev.expenses],
+      auditLogs: [audit, ...prev.auditLogs],
+    }));
+
+    return newEvent;
+  }, [state.emergencyEvents.length, state.members, state.expenses.length, state.settings.emergencyFee, isAdmin]);
+
+  const addEmergencyEvent = createEmergencyEvent;
+
+  const updateEmergencyEvent = useCallback((id: string, updates: Partial<EmergencyEvent>) => {
+    setState(prev => {
+      const updatedEvents = prev.emergencyEvents.map(e => 
+        e.id === id ? { ...e, ...updates } : e
+      );
+      const audit = addAuditLog('UPDATE_EMERGENCY_EVENT', `Updated emergency event ${id}`, 'EmergencyEvent', id);
+      return {
+        ...prev,
+        emergencyEvents: updatedEvents,
+        auditLogs: [audit, ...prev.auditLogs],
+      };
+    });
+  }, [isAdmin]);
+
+  const deleteEmergencyEvent = useCallback((id: string) => {
+    setState(prev => {
+      const ev = prev.emergencyEvents.find(e => e.id === id);
+      const updatedEvents = prev.emergencyEvents.filter(e => e.id !== id);
+      const audit = addAuditLog('DELETE_EMERGENCY_EVENT', `Deleted emergency event ${ev?.deceasedName || id}`, 'EmergencyEvent', id);
+      return {
+        ...prev,
+        emergencyEvents: updatedEvents,
+        auditLogs: [audit, ...prev.auditLogs],
+      };
+    });
+  }, [isAdmin]);
+
+  // 8. ANNOUNCEMENTS CRUD
+  const addAnnouncement = useCallback((data: Omit<Announcement, 'id' | 'createdAt'>) => {
+    const id = `ANN-${Date.now()}`;
+    const now = new Date().toISOString();
+    const newAnn: Announcement = {
+      ...data,
+      id,
+      createdAt: now,
+    };
+
+    setState(prev => ({
+      ...prev,
+      announcements: [newAnn, ...(prev.announcements || [])],
+      auditLogs: [addAuditLog('ADD_ANNOUNCEMENT', `Added notice: ${newAnn.title}`, 'Announcement', id), ...prev.auditLogs],
+    }));
+
+    return newAnn;
+  }, [isAdmin]);
+
+  const updateAnnouncement = useCallback((id: string, updates: Partial<Announcement>) => {
+    setState(prev => {
+      const updated = (prev.announcements || []).map(a => a.id === id ? { ...a, ...updates } : a);
+      return {
+        ...prev,
+        announcements: updated,
+      };
+    });
+  }, []);
+
+  const deleteAnnouncement = useCallback((id: string) => {
+    setState(prev => ({
+      ...prev,
+      announcements: (prev.announcements || []).filter(a => a.id !== id),
+    }));
+  }, []);
+
+  // 9. UPDATE SETTINGS
   const updateSettings = useCallback((updates: Partial<OrganizationSettings>) => {
     setState(prev => {
       const newSettings = { ...prev.settings, ...updates };
@@ -832,19 +1060,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         auditLogs: [audit, ...prev.auditLogs],
       };
     });
-  }, [currentRole]);
+  }, [isAdmin]);
 
-  // 15. Export Backup JSON
+  // 10. BACKUP & RESTORE
   const exportBackupJson = useCallback(() => {
     const backupData = {
-      app: 'Anjuman Falah-o-Behbood Chamhatti Khala Butt',
+      app: 'Anjuman Falah-o-Bahbood Chamhatti Wa Khalabat Butt Karachi',
       exportedAt: new Date().toISOString(),
-      version: '1.0',
+      version: '2.0',
       database: state,
     };
     const jsonStr = JSON.stringify(backupData, null, 2);
 
-    // Update lastBackupDate in settings
     const nowFormatted = new Date().toISOString().replace('T', ' ').substring(0, 19);
     setState(prev => ({
       ...prev,
@@ -857,50 +1084,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return jsonStr;
   }, [state]);
 
-  // 16. Restore Backup JSON (with pre-restore snapshot and verification)
   const restoreBackupJson = useCallback((jsonString: string): { success: boolean; message: string } => {
     try {
       const parsed = JSON.parse(jsonString);
       const incomingState: AppState = parsed.database || parsed;
 
-      // Schema verification (Enforces Test H)
-      if (
-        !incomingState.settings ||
-        !Array.isArray(incomingState.members) ||
-        !Array.isArray(incomingState.obligations) ||
-        !Array.isArray(incomingState.payments) ||
-        !Array.isArray(incomingState.expenses)
-      ) {
-        return { success: false, message: 'Invalid backup format. Required database collections are missing.' };
+      if (!incomingState.settings || !Array.isArray(incomingState.members)) {
+        return { success: false, message: 'Invalid backup format. Missing required database tables.' };
       }
 
-      // Pre-restore safety snapshot
-      try {
-        localStorage.setItem(PRE_RESTORE_BACKUP_KEY, JSON.stringify(state));
-      } catch (snapshotErr) {
-        console.warn('Failed to save pre-restore snapshot:', snapshotErr);
-      }
-
-      // Safe restore
       setState(incomingState);
       return {
         success: true,
-        message: `Successfully restored backup! Restored ${incomingState.members.length} members, ${incomingState.payments.length} payments, and ${incomingState.expenses.length} expenses.`,
+        message: `Successfully restored backup with ${incomingState.members.length} members!`,
       };
     } catch (err: any) {
       return { success: false, message: `Failed to parse backup JSON: ${err.message}` };
     }
-  }, [state]);
+  }, []);
 
-  // 17. Reset to Initial Data (Explicit action with pre-snapshot)
   const resetToInitialData = useCallback(() => {
-    try {
-      localStorage.setItem(PRE_RESTORE_BACKUP_KEY, JSON.stringify(state));
-    } catch (err) {
-      console.warn(err);
-    }
     setState(initialAppState);
-  }, [state]);
+  }, []);
 
   const value: AppContextType = {
     state,
@@ -910,23 +1115,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentRole,
     activeTab,
     setActiveTab,
+    isAdmin,
+    isPasswordConfigured,
+    adminLogin,
+    adminLogout,
+    setupInitialAdminPassword,
+    updateAdminPin,
+    recoverAdminPassword,
+    resetAdminToSetupMode,
     accountingSummary,
     getMemberSummary,
+    cleanAllFinancialRecords,
     addMember,
     updateMember,
-    archiveMember,
-    generateMonthlyFees,
-    recordBulkMonthlyPayment,
-    createEmergencyEvent,
-    recordPayment,
-    reversePayment,
+    deleteMember,
+    addOfficeBearer,
+    updateOfficeBearer,
+    deleteOfficeBearer,
+    addPayment,
+    updatePayment,
+    deletePayment,
     latestReceipt,
     setLatestReceipt,
-    addIncome,
-    reverseIncome,
+    generateMonthlyFees,
+    recordBulkMonthlyPayment,
     addExpense,
     updateExpense,
-    reverseExpense,
+    deleteExpense,
+    addIncome,
+    updateIncome,
+    deleteIncome,
+    createEmergencyEvent,
+    addEmergencyEvent,
+    updateEmergencyEvent,
+    deleteEmergencyEvent,
+    addAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement,
     updateSettings,
     exportBackupJson,
     restoreBackupJson,
