@@ -1,0 +1,6 @@
+{
+  "name": "Anjuman Falah-o-Behbood Chamhatti Khala Butt Management System",
+  "description": "Comprehensive association management and accounting system for Anjuman Falah-o-Behbood Chamhatti Khala Butt with member ledgers, monthly fees, emergency death welfare funds, and financial reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
