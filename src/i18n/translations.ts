@@ -2,9 +2,9 @@ import { Language } from '../types';
 
 export const translations = {
   en: {
-    appName: 'Anjuman Falah-o-Behbood Chamhatti Khala Butt',
+    appName: 'Anjuman Falah-o-Bahbood Chamhatti Khala Butt Karachi',
     appSubtitle: 'Welfare & Accounting Management System',
-    chamhatti: 'Chamhatti Khala Butt',
+    chamhatti: 'Chamhatti Khala Butt Karachi',
     nav: {
       dashboard: 'Dashboard',
       members: 'Members',
@@ -27,7 +27,7 @@ export const translations = {
       edit: 'Edit',
       view: 'View',
       print: 'Print Receipt',
-      downloadPdf: 'Print / Save PDF',
+      downloadPdf: 'Payment Receipt PDF',
       exportCsv: 'Export CSV',
       search: 'Search...',
       filter: 'Filter',
@@ -149,6 +149,7 @@ export const translations = {
       autoAllocate: 'Auto Allocate to Oldest Dues',
       printReceipt: 'Print Official Receipt',
       noDues: 'Member has no outstanding dues at this time',
+      annualMonthlyFee: 'Annual Monthly Fee (سالانہ ماہانہ فیس)',
     },
     income: {
       title: 'General Income & Donations',
@@ -200,9 +201,9 @@ export const translations = {
     }
   },
   ur: {
-    appName: 'انجمن فلاح و بہبود چھمھٹی خالصہ / کھالہ بٹ',
+    appName: 'انجمن فلاح و بہبود چمہٹی کھلابٹ کراچی',
     appSubtitle: 'انتظامی و مالیاتی اکاؤنٹنگ سسٹم',
-    chamhatti: 'چھمھٹی کھالہ بٹ',
+    chamhatti: 'چمہٹی کھلابٹ کراچی',
     nav: {
       dashboard: 'ڈیش بورڈ',
       members: 'ممبران کی فہرست',
@@ -225,7 +226,7 @@ export const translations = {
       edit: 'ترمیم کریں',
       view: 'تفصیل دیکھیں',
       print: 'رسید پرنٹ کریں',
-      downloadPdf: 'پرنٹ / پی ڈی ایف',
+      downloadPdf: 'پی ڈی ایف رسید (PDF Receipt)',
       exportCsv: 'ایکسل CSV ایکسپورٹ',
       search: 'تلاش کریں...',
       filter: 'فلٹر',
@@ -347,6 +348,7 @@ export const translations = {
       autoAllocate: 'پرانے بقایاجات میں خود بخود تقسیم کریں',
       printReceipt: 'رسید پرنٹ کریں',
       noDues: 'اس ممبر کے ذمہ فی الحال کوئی رقم واجب الادا نہیں ہے',
+      annualMonthlyFee: 'سالانہ ماہانہ فیس (Annual Monthly Fee)',
     },
     income: {
       title: 'دیگر آمدن و عطیات',
@@ -398,9 +400,9 @@ export const translations = {
     }
   },
   ur_roman: {
-    appName: 'Anjuman Falah-o-Behbood Chamhatti Khala Butt',
+    appName: 'Anjuman Falah-o-Bahbood Chamhatti Khala Butt Karachi',
     appSubtitle: 'Welfare aur Accounting Management System',
-    chamhatti: 'Chamhatti Khala Butt',
+    chamhatti: 'Chamhatti Khala Butt Karachi',
     nav: {
       dashboard: 'Dashboard',
       members: 'Members List',
@@ -423,7 +425,7 @@ export const translations = {
       edit: 'Edit Karein',
       view: 'Tafseel Dekhein',
       print: 'Raseed Print Karein',
-      downloadPdf: 'Print / Save PDF',
+      downloadPdf: 'Payment Receipt PDF',
       exportCsv: 'Excel CSV Download',
       search: 'Talaash karein...',
       filter: 'Filter',
@@ -545,6 +547,7 @@ export const translations = {
       autoAllocate: 'Puranay Dues par Khudbakhud Divide Karein',
       printReceipt: 'Sarkari Raseed Print Karein',
       noDues: 'Iss member ka koi baqaya wajib ul ada nahi hai',
+      annualMonthlyFee: 'Annual Monthly Fee (Salana Mahana Fees)',
     },
     income: {
       title: 'Digar Aamdan aur Atiyaat',

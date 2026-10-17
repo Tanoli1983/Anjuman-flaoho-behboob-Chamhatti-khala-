@@ -107,7 +107,7 @@ export const Reports: React.FC<{ onSelectMemberForLedger: (memberId: string) => 
           subtitle: 'Historical record of monthly contributions',
           headers: ['Month', 'Member ID', 'Name', 'Due', 'Paid', 'Outstanding', 'Status'],
           rows,
-          summaryNote: `Total Monthly Collections to Date: ${formatCurrency(accountingSummary.totalMonthlyFees)}`,
+          summaryNote: `Regular Monthly Collections: ${formatCurrency(accountingSummary.totalMonthlyFees)} | Annual Multi-Year Collections: ${formatCurrency(accountingSummary.totalAnnualMonthlyFees || 0)}`,
         };
       }
       case '4': { // Monthly Fee Outstanding
@@ -265,16 +265,17 @@ export const Reports: React.FC<{ onSelectMemberForLedger: (memberId: string) => 
         const rows = [
           { col1: '1', col2: 'Opening Cash Balance (ابتدائی بیلنس)', col3: 'Carry-forward', col4: '-', col5: '-', col6: '-', col7: formatCurrency(accountingSummary.openingBalance) },
           { col1: '2', col2: 'New Member Registration Fees (داخلہ فیس)', col3: 'Member Inflow', col4: '-', col5: '-', col6: '-', col7: `+ ${formatCurrency(accountingSummary.totalRegistrationFees)}` },
-          { col1: '3', col2: 'Monthly Membership Fees (ماہانہ فیس)', col3: 'Member Inflow', col4: '-', col5: '-', col6: '-', col7: `+ ${formatCurrency(accountingSummary.totalMonthlyFees)}` },
-          { col1: '4', col2: 'Emergency Death Welfare Funds (کفن دفن فنڈ)', col3: 'Member Inflow', col4: '-', col5: '-', col6: '-', col7: `+ ${formatCurrency(accountingSummary.totalEmergencyFees)}` },
-          { col1: '5', col2: 'General Donations & Overseas Grants (عام عطیات)', col3: 'Donation Inflow', col4: '-', col5: '-', col6: '-', col7: `+ ${formatCurrency(accountingSummary.totalDonationsAndOtherIncome)}` },
-          { col1: '6', col2: 'TOTAL CASH INCOME COLLECTED (کل وصول شدہ آمدن)', col3: 'Sum of Inflows', col4: '-', col5: '-', col6: '-', col7: `= ${formatCurrency(accountingSummary.totalIncomeCollected)}` },
-          { col1: '7', col2: 'TOTAL VALID EXPENSES (کل اخراجات)', col3: 'Disbursements', col4: '-', col5: '-', col6: '-', col7: `- ${formatCurrency(accountingSummary.totalExpenses)}` },
-          { col1: '8', col2: 'NET CASH BALANCE (خالص کیش بیلنس)', col3: 'Reconciled', col4: '-', col5: '-', col6: '-', col7: `= ${formatCurrency(accountingSummary.netCashBalance)}` },
+          { col1: '3', col2: 'Regular Monthly Membership Fees (ماہانہ فیس)', col3: 'Member Inflow', col4: '-', col5: '-', col6: '-', col7: `+ ${formatCurrency(accountingSummary.totalMonthlyFees)}` },
+          { col1: '4', col2: 'Annual Monthly Fees (سالانہ ماہانہ فیس - کثیر سالہ وصولی)', col3: 'Member Inflow (Multi-Year)', col4: '-', col5: '-', col6: '-', col7: `+ ${formatCurrency(accountingSummary.totalAnnualMonthlyFees || 0)}` },
+          { col1: '5', col2: 'Emergency Death Welfare Funds (کفن دفن فنڈ)', col3: 'Member Inflow', col4: '-', col5: '-', col6: '-', col7: `+ ${formatCurrency(accountingSummary.totalEmergencyFees)}` },
+          { col1: '6', col2: 'General Donations & Overseas Grants (عام عطیات)', col3: 'Donation Inflow', col4: '-', col5: '-', col6: '-', col7: `+ ${formatCurrency(accountingSummary.totalDonationsAndOtherIncome)}` },
+          { col1: '7', col2: 'TOTAL CASH INCOME COLLECTED (کل وصول شدہ آمدن)', col3: 'Sum of Inflows', col4: '-', col5: '-', col6: '-', col7: `= ${formatCurrency(accountingSummary.totalIncomeCollected)}` },
+          { col1: '8', col2: 'TOTAL VALID EXPENSES (کل اخراجات)', col3: 'Disbursements', col4: '-', col5: '-', col6: '-', col7: `- ${formatCurrency(accountingSummary.totalExpenses)}` },
+          { col1: '9', col2: 'NET CASH BALANCE (خالص کیش بیلنس)', col3: 'Reconciled', col4: '-', col5: '-', col6: '-', col7: `= ${formatCurrency(accountingSummary.netCashBalance)}` },
         ];
         return {
           title: `Annual Financial Income & Expense Statement (${state.settings.financialYear})`,
-          subtitle: 'Authoritative financial reconciliation for Anjuman Falah-o-Behbood Chamhatti Khala Butt',
+          subtitle: 'Authoritative financial reconciliation for Anjuman Falah-o-Bahbood Chamhatti Khala Butt Karachi',
           headers: ['#', 'Particulars / کھاتہ تفصیل', 'Account Type', '', '', '', 'Amount (PKR)'],
           rows,
           summaryNote: `Net In-Hand Cash Balance: ${formatCurrency(accountingSummary.netCashBalance)} | Total Member Arrears: ${formatCurrency(accountingSummary.totalMemberArrears)}`,
@@ -472,8 +473,11 @@ export const Reports: React.FC<{ onSelectMemberForLedger: (memberId: string) => 
             <h3 className="text-base font-bold text-emerald-800 font-urdu mt-0.5">
               {state.settings.orgNameUrdu}
             </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Financial Year: {state.settings.financialYear} • Chamhatti Khala Butt, Haripur / KPK
+            <p className="text-xs font-semibold text-emerald-900 mt-1">
+              Registered Number: K/2018 DSW(4347) • رجسٹریشن نمبر: K/2018 DSW(4347)
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Financial Year: {state.settings.financialYear} • Chamhatti Khala Butt Karachi, Pakistan
             </p>
           </div>
 
@@ -558,7 +562,7 @@ export const Reports: React.FC<{ onSelectMemberForLedger: (memberId: string) => 
               <div className="border-t border-slate-400 pt-1 font-semibold text-slate-800">
                 President / General Secretary (صدر)
               </div>
-              <p className="text-[10px] text-slate-400">Anjuman Falah-o-Behbood Chamhatti</p>
+              <p className="text-[10px] text-slate-400">Anjuman Falah-o-Bahbood Chamhatti Khala Butt Karachi</p>
             </div>
           </div>
         </div>

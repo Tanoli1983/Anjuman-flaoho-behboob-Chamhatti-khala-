@@ -43,14 +43,22 @@ export const MonthlyFees: React.FC<{ onSelectMemberForPayment: (memberId: string
     let totalCollected = 0;
 
     const list = eligibleMembers.map((member) => {
-      // Find obligation for this member and this month
       const obl = state.obligations.find(
         (o) => o.memberId === member.id && o.type === 'monthly' && o.periodMonth === selectedMonth
       );
 
+      const directPayment = state.payments.find(
+        (p) =>
+          p.memberId === member.id &&
+          p.status !== 'reversed' &&
+          (p.allocations?.some((a) => a.periodMonth === selectedMonth && a.type === 'monthly') ||
+            ((p.paymentCategory === 'monthly' || p.paymentCategory === 'annual_monthly') &&
+              p.relevantPeriod?.includes(selectedMonth)))
+      );
+
       const due = obl ? obl.amountDue : feeRate;
-      const paid = obl ? obl.amountPaid : 0;
-      const status = obl ? obl.status : 'unpaid';
+      const paid = obl ? obl.amountPaid : directPayment ? feeRate : 0;
+      const status = obl ? obl.status : directPayment ? 'paid' : 'unpaid';
 
       totalDue += due;
       totalCollected += paid;

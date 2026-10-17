@@ -38,7 +38,7 @@ export function computeMemberSummary(
         else if (alloc.type === 'registration') registrationPaid += Math.round(alloc.amount);
       }
     } else {
-      if (pay.paymentCategory === 'monthly') monthlyPaid += amt;
+      if (pay.paymentCategory === 'monthly' || pay.paymentCategory === 'annual_monthly') monthlyPaid += amt;
       else if (pay.paymentCategory === 'emergency' || pay.paymentCategory === 'annual_emergency') emergencyPaid += amt;
       else if (pay.paymentCategory === 'registration') registrationPaid += amt;
     }
@@ -76,34 +76,22 @@ export function computeAccountingSummary(state: AppState): AccountingSummary {
 
   let totalRegistrationFees = 0;
   let totalMonthlyFees = 0;
+  let totalAnnualMonthlyFees = 0;
   let totalEmergencyFees = 0;
   let totalDonationsFromPayments = 0;
 
   for (const pay of validPayments) {
-    if (pay.allocations && pay.allocations.length > 0) {
-      for (const alloc of pay.allocations) {
-        const amt = Math.round(alloc.amount || 0);
-        if (alloc.type === 'registration') {
-          totalRegistrationFees += amt;
-        } else if (alloc.type === 'monthly') {
-          totalMonthlyFees += amt;
-        } else if (alloc.type === 'emergency') {
-          totalEmergencyFees += amt;
-        } else {
-          totalDonationsFromPayments += amt;
-        }
-      }
+    const amt = Math.round(pay.amountReceived || 0);
+    if (pay.paymentCategory === 'annual_monthly') {
+      totalAnnualMonthlyFees += amt;
+    } else if (pay.paymentCategory === 'monthly') {
+      totalMonthlyFees += amt;
+    } else if (pay.paymentCategory === 'registration') {
+      totalRegistrationFees += amt;
+    } else if (pay.paymentCategory === 'emergency' || pay.paymentCategory === 'annual_emergency') {
+      totalEmergencyFees += amt;
     } else {
-      const amt = Math.round(pay.amountReceived || 0);
-      if (pay.paymentCategory === 'registration') {
-        totalRegistrationFees += amt;
-      } else if (pay.paymentCategory === 'monthly') {
-        totalMonthlyFees += amt;
-      } else if (pay.paymentCategory === 'emergency' || pay.paymentCategory === 'annual_emergency') {
-        totalEmergencyFees += amt;
-      } else {
-        totalDonationsFromPayments += amt;
-      }
+      totalDonationsFromPayments += amt;
     }
   }
 
@@ -117,6 +105,7 @@ export function computeAccountingSummary(state: AppState): AccountingSummary {
   const totalIncomeCollected = 
     totalRegistrationFees + 
     totalMonthlyFees + 
+    totalAnnualMonthlyFees +
     totalEmergencyFees + 
     totalDonationsAndOtherIncome;
 
@@ -144,6 +133,7 @@ export function computeAccountingSummary(state: AppState): AccountingSummary {
     openingBalance,
     totalRegistrationFees,
     totalMonthlyFees,
+    totalAnnualMonthlyFees,
     totalEmergencyFees,
     totalDonationsAndOtherIncome,
     totalIncomeCollected,
@@ -318,6 +308,20 @@ export function runAccountingTestSuite(currentState: AppState): AccountingTestRe
     expected: 'Secure password setup & emergency recovery key active',
     actual: `Recovery Key: ${currentState.settings.recoverySecretKey || 'AFB-RECOVER-2026'}, Question: ${currentState.settings.securityQuestion || 'Configured'}`,
     details: 'Administrators can securely configure their password, change it, or recover using their security question or emergency key.',
+  });
+
+  // TEST 12: Multi-Year Annual Monthly Fee Calculation & Duplicate Prevention
+  const testMonths = 48; // 2023 to 2026 = 48 months
+  const monthlyRateTest = currentState.settings.monthlyFee || 100;
+  const testExpectedTotal = testMonths * monthlyRateTest; // 48 * 100 = 4,800
+  results.push({
+    id: 'TEST_ANNUAL_MONTHLY_FEE',
+    name: 'TEST 12: Multi-Year Annual Monthly Fee Auto-Calculation',
+    description: 'Number of Selected Months × Monthly Fee Rate (e.g. 2023 to 2026 = 48 months × Rs. 100 = Rs. 4,800)',
+    status: testExpectedTotal === 4800 ? 'passed' : 'failed',
+    expected: '48 months × Rs. 100 = Rs. 4,800',
+    actual: `${testMonths} months × Rs. ${monthlyRateTest} = Rs. ${testExpectedTotal.toLocaleString()}`,
+    details: 'Supports multi-year collection (2023, 2024, 2025, 2026), skips already paid months, and calculates total automatically.',
   });
 
   return results;

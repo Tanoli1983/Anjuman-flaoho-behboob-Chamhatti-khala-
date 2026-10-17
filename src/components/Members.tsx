@@ -450,7 +450,7 @@ export const Members: React.FC<MembersProps> = ({
 
               <div>
                 <label className="block text-slate-700 font-semibold mb-1">
-                  Address (Karachi / Haripur)
+                  Address (Karachi / Chamhatti Khala Butt)
                 </label>
                 <input
                   type="text"

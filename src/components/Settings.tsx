@@ -33,6 +33,8 @@ export const Settings: React.FC = () => {
 
   const [orgName, setOrgName] = useState(state.settings.orgName);
   const [orgNameUrdu, setOrgNameUrdu] = useState(state.settings.orgNameUrdu);
+  const [registrationNumber, setRegistrationNumber] = useState(state.settings.registrationNumber || 'Registered Number: K/2018 DSW(4347)');
+  const [registrationNumberUrdu, setRegistrationNumberUrdu] = useState(state.settings.registrationNumberUrdu || 'رجسٹریشن نمبر: K/2018 DSW(4347)');
   const [address, setAddress] = useState(state.settings.address);
   const [phone, setPhone] = useState(state.settings.phone);
   const [financialYear, setFinancialYear] = useState(state.settings.financialYear);
@@ -61,6 +63,8 @@ export const Settings: React.FC = () => {
     updateSettings({
       orgName,
       orgNameUrdu,
+      registrationNumber,
+      registrationNumberUrdu,
       address,
       phone,
       financialYear,
@@ -136,6 +140,33 @@ export const Settings: React.FC = () => {
                 value={orgNameUrdu}
                 onChange={(e) => setOrgNameUrdu(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg font-urdu text-base font-bold text-slate-900"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Registration Number (English)
+              </label>
+              <input
+                type="text"
+                value={registrationNumber}
+                onChange={(e) => setRegistrationNumber(e.target.value)}
+                placeholder="Registered Number: K/2018 DSW(4347)"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 font-medium text-slate-900 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Registration Number (Urdu / رجسٹریشن نمبر)
+              </label>
+              <input
+                type="text"
+                value={registrationNumberUrdu}
+                onChange={(e) => setRegistrationNumberUrdu(e.target.value)}
+                placeholder="رجسٹریشن نمبر: K/2018 DSW(4347)"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-urdu font-medium text-slate-900 text-sm"
               />
             </div>
           </div>

@@ -14,11 +14,14 @@ import {
   TrendingDown,
   ShieldCheck,
   CalendarCheck,
+  CalendarRange,
   Clock,
   Printer,
   Sparkles,
   RotateCcw,
+  FileDown,
 } from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }) => {
   const { state, language, isAdmin, accountingSummary, setActiveTab, setLatestReceipt, cleanAllFinancialRecords } = useApp();
@@ -34,7 +37,7 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
       id: p.id,
       type: 'payment' as const,
       title: `${p.memberName} (${p.receiptNumber})`,
-      subtitle: `${p.paymentCategory.toUpperCase()} Fee • ${p.notes || 'Recorded in cash/bank'}`,
+      subtitle: `${p.paymentCategory === 'annual_monthly' ? 'ANNUAL MONTHLY' : p.paymentCategory.toUpperCase()} Fee • ${p.relevantPeriod ? p.relevantPeriod + ' • ' : ''}${p.notes || 'Recorded in cash/bank'}`,
       amount: p.amountReceived,
       date: p.date,
       status: p.status,
@@ -77,7 +80,7 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
           <div>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-700/80 text-emerald-100 border border-emerald-500/30 mb-2">
               <ShieldCheck className="w-3.5 h-3.5" />
-              {state.settings.financialYear} • Karachi & Haripur
+              {state.settings.financialYear} • Karachi, Pakistan
             </span>
             <h2 className="text-lg sm:text-2xl font-bold leading-tight">
               {state.settings.orgName}
@@ -85,6 +88,13 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
             <p className="text-xs sm:text-sm text-emerald-100/90 font-urdu mt-1">
               {state.settings.orgNameUrdu}
             </p>
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap text-xs">
+              <span className="inline-block bg-emerald-950/60 text-amber-200 px-2.5 py-0.5 rounded-md border border-emerald-500/40 font-medium">
+                {language === 'ur'
+                  ? (state.settings.registrationNumberUrdu || 'رجسٹریشن نمبر: K/2018 DSW(4347)')
+                  : (state.settings.registrationNumber || 'Registered Number: K/2018 DSW(4347)')}
+              </span>
+            </div>
           </div>
 
           {/* Quick Cash Balance Display */}
@@ -104,6 +114,9 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
         {/* Subtle decorative circles */}
         <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/5 rounded-full blur-xl pointer-events-none" />
       </div>
+
+      {/* PWA Mobile Installation Callout */}
+      <PWAInstallButton variant="banner" />
 
       {/* Main 4 Primary KPI Financial Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -138,7 +151,7 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
               {formatCurrency(accountingSummary.totalIncomeCollected)}
             </div>
             <div className="text-[11px] text-slate-500 mt-1 truncate">
-              Monthly + Emergency + Reg + Donations
+              Monthly + Annual Monthly + Emergency + Reg + Donations
             </div>
           </div>
         </div>
@@ -241,61 +254,109 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
         </div>
       </div>
 
-      {/* Secondary Detailed Fee Category Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Monthly Fees Received */}
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
+      {/* Secondary Detailed Fee Category Cards (Separating all 5/6 income streams) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
+        {/* 1. Regular Monthly Fees Received */}
+        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold text-slate-600 truncate">Monthly Fees Received</span>
-            <CalendarCheck className="w-4 h-4 text-blue-600" />
+            <span className="text-[11px] font-bold text-slate-700 truncate">Regular Monthly</span>
+            <CalendarCheck className="w-3.5 h-3.5 text-blue-600" />
           </div>
-          <div className="text-xl font-bold text-slate-800">
-            {formatCurrency(accountingSummary.totalMonthlyFees)}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Rs. {state.settings.monthlyFee || 100} / member / month
+          <div>
+            <div className="text-base sm:text-lg font-black text-slate-900">
+              {formatCurrency(accountingSummary.totalMonthlyFees)}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+              Rs. {state.settings.monthlyFee || 100} / month
+            </div>
           </div>
         </div>
 
-        {/* Emergency Fees Received */}
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold text-slate-600 truncate">Emergency Fees Received</span>
-            <HeartHandshake className="w-4 h-4 text-purple-600" />
+        {/* 2. Annual Monthly Fee (Multi-Year) */}
+        <div className="bg-gradient-to-br from-indigo-50/80 to-white p-3 rounded-xl border border-indigo-200 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-indigo-700 mb-1">
+            <span className="text-[11px] font-bold text-indigo-950 truncate">Annual Monthly Fee</span>
+            <CalendarRange className="w-3.5 h-3.5 text-indigo-600" />
           </div>
-          <div className="text-xl font-bold text-slate-800">
-            {formatCurrency(accountingSummary.totalEmergencyFees)}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Rs. {state.settings.emergencyFee || 100} / death fund
-          </div>
-        </div>
-
-        {/* Registration Fees Received */}
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold text-slate-600 truncate">Registration Fees Received</span>
-            <ReceiptText className="w-4 h-4 text-teal-600" />
-          </div>
-          <div className="text-xl font-bold text-slate-800">
-            {formatCurrency(accountingSummary.totalRegistrationFees)}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Rs. {state.settings.registrationFee || 200} / new member
+          <div>
+            <div className="text-base sm:text-lg font-black text-indigo-900">
+              {formatCurrency(accountingSummary.totalAnnualMonthlyFees || 0)}
+            </div>
+            <div className="text-[10px] text-indigo-700 font-urdu mt-0.5 truncate">
+              سالانہ ماہانہ فیس (Multi-Year)
+            </div>
           </div>
         </div>
 
-        {/* Donations & Other Income */}
-        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
+        {/* 3. Emergency Fees Received (Per Death) */}
+        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold text-slate-600 truncate">Donations & Other Income</span>
-            <Sparkles className="w-4 h-4 text-amber-600" />
+            <span className="text-[11px] font-bold text-slate-700 truncate">Emergency Fee</span>
+            <HeartHandshake className="w-3.5 h-3.5 text-purple-600" />
           </div>
-          <div className="text-xl font-bold text-slate-800">
-            {formatCurrency(accountingSummary.totalDonationsAndOtherIncome)}
+          <div>
+            <div className="text-base sm:text-lg font-black text-purple-900">
+              {formatCurrency(
+                (state.payments || [])
+                  .filter(p => p.status !== 'reversed' && p.paymentCategory === 'emergency')
+                  .reduce((sum, p) => sum + p.amountReceived, 0)
+              )}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+              کفن دفن فنڈ (فی وفات)
+            </div>
           </div>
-          <div className="text-xs text-slate-500 mt-1">
-            General community contributions
+        </div>
+
+        {/* 4. Annual Emergency Fee */}
+        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
+            <span className="text-[11px] font-bold text-slate-700 truncate">Annual Emergency</span>
+            <HeartHandshake className="w-3.5 h-3.5 text-purple-700" />
+          </div>
+          <div>
+            <div className="text-base sm:text-lg font-black text-purple-900">
+              {formatCurrency(
+                (state.payments || [])
+                  .filter(p => p.status !== 'reversed' && p.paymentCategory === 'annual_emergency')
+                  .reduce((sum, p) => sum + p.amountReceived, 0)
+              )}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+              سالانہ کفن دفن فنڈ
+            </div>
+          </div>
+        </div>
+
+        {/* 5. Registration Fees Received */}
+        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
+            <span className="text-[11px] font-bold text-slate-700 truncate">Registration Fee</span>
+            <ReceiptText className="w-3.5 h-3.5 text-teal-600" />
+          </div>
+          <div>
+            <div className="text-base sm:text-lg font-black text-teal-800">
+              {formatCurrency(accountingSummary.totalRegistrationFees)}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+              داخلہ فیس (New Members)
+            </div>
+          </div>
+        </div>
+
+        {/* 6. Donations & Other Income */}
+        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
+            <span className="text-[11px] font-bold text-slate-700 truncate">Donations / Other</span>
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+          </div>
+          <div>
+            <div className="text-base sm:text-lg font-black text-amber-900">
+              {formatCurrency(accountingSummary.totalDonationsAndOtherIncome)}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5 truncate font-urdu">
+              عام عطیات و امداد
+            </div>
           </div>
         </div>
       </div>
@@ -417,13 +478,22 @@ export const Dashboard: React.FC<{ onOpenTests: () => void }> = ({ onOpenTests }
                   {formatCurrency(tx.amount)}
                 </span>
                 {tx.type === 'payment' && (
-                  <button
-                    onClick={() => setLatestReceipt(tx.raw as any)}
-                    title="Print Receipt"
-                    className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
-                  >
-                    <Printer className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setLatestReceipt(tx.raw as any)}
+                      title="Payment Receipt PDF (View & Download)"
+                      className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100/70 rounded-lg transition cursor-pointer"
+                    >
+                      <FileDown className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setLatestReceipt(tx.raw as any)}
+                      title="Print Receipt"
+                      className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

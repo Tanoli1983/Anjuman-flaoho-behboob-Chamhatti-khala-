@@ -80,6 +80,8 @@ interface AppContextType {
     date: string;
     relevantPeriod?: string;
     notes?: string;
+    coveredMonths?: string[];
+    allocations?: PaymentAllocation[];
   }) => PaymentRecord;
   updatePayment: (id: string, updates: Partial<PaymentRecord>) => void;
   deletePayment: (id: string) => void;
@@ -165,8 +167,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             settings: {
               ...initialAppState.settings,
               ...parsed.settings,
-              orgName: 'Anjuman Falah-o-Bahbood Chamhatti Wa Khalabat Butt Karachi',
-              orgNameUrdu: 'انجمن فلاح و بہبود چھمھٹی و خالصہ بٹ کراچی',
+              orgName: 'Anjuman Falah-o-Bahbood Chamhatti Khala Butt Karachi',
+              orgNameUrdu: 'انجمن فلاح و بہبود چمہٹی کھلابٹ کراچی',
+              registrationNumber: 'Registered Number: K/2018 DSW(4347)',
+              registrationNumberUrdu: 'رجسٹریشن نمبر: K/2018 DSW(4347)',
+              address: (parsed.settings.address || 'Central Office Karachi, Pakistan')
+                .replace(/Haripur[^,]*,?\s*/gi, '')
+                .replace(/\/\s*Native Village.*$/gi, '')
+                .trim() || 'Central Office Karachi, Pakistan',
               registrationFee: parsed.settings.registrationFee || 200,
               monthlyFee: parsed.settings.monthlyFee || 100,
               emergencyFee: parsed.settings.emergencyFee || 100,
@@ -539,6 +547,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     date: string;
     relevantPeriod?: string;
     notes?: string;
+    coveredMonths?: string[];
+    allocations?: PaymentAllocation[];
   }) => {
     const member = state.members.find(m => m.id === data.memberId);
     if (!member) throw new Error('Member not found');
@@ -546,6 +556,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const year = new Date().getFullYear();
     const receiptNo = generateReceiptNumber(year, state.payments.length, state.settings.receiptPrefix);
     const now = new Date().toISOString();
+
+    let computedAllocations: PaymentAllocation[] = [];
+    if (data.allocations && data.allocations.length > 0) {
+      computedAllocations = data.allocations;
+    } else if (data.paymentCategory === 'annual_monthly' && data.coveredMonths && data.coveredMonths.length > 0) {
+      const perMonth = Math.round(data.amountReceived / data.coveredMonths.length) || (state.settings.monthlyFee || 100);
+      computedAllocations = data.coveredMonths.map(month => ({
+        obligationId: `OBL-M-${member.id}-${month}`,
+        type: 'monthly',
+        periodMonth: month,
+        title: `Annual Monthly Fee (${month})`,
+        amount: perMonth,
+      }));
+    } else {
+      computedAllocations = [
+        {
+          type: (data.paymentCategory === 'monthly' || data.paymentCategory === 'annual_monthly' ? 'monthly' : data.paymentCategory === 'emergency' ? 'emergency' : 'registration') as any,
+          periodMonth: data.relevantPeriod,
+          title: `${data.paymentCategory === 'annual_monthly' ? 'ANNUAL MONTHLY' : data.paymentCategory.toUpperCase()} Fee Payment`,
+          amount: Math.round(data.amountReceived),
+        }
+      ];
+    }
 
     const newPayment: PaymentRecord = {
       id: `PAY-${Date.now()}`,
@@ -559,14 +592,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       relevantPeriod: data.relevantPeriod || data.date.substring(0, 7),
       notes: data.notes || '',
       recordedBy: isAdmin ? 'Admin' : 'Treasurer',
-      allocations: [
-        {
-          type: (data.paymentCategory === 'monthly' ? 'monthly' : data.paymentCategory === 'emergency' ? 'emergency' : 'registration') as any,
-          periodMonth: data.relevantPeriod,
-          title: `${data.paymentCategory.toUpperCase()} Fee Payment`,
-          amount: Math.round(data.amountReceived),
-        }
-      ],
+      allocations: computedAllocations,
       status: 'valid',
       createdAt: now,
       updatedAt: now,
@@ -579,15 +605,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       newPayment.id
     );
 
-    setState(prev => ({
-      ...prev,
-      payments: [newPayment, ...prev.payments],
-      auditLogs: [audit, ...prev.auditLogs],
-    }));
+    setState(prev => {
+      let updatedObligations = [...prev.obligations];
+
+      // If annual_monthly with coveredMonths, ensure obligations exist and are marked paid
+      if (data.paymentCategory === 'annual_monthly' && data.coveredMonths && data.coveredMonths.length > 0) {
+        const perMonth = Math.round(data.amountReceived / data.coveredMonths.length) || (state.settings.monthlyFee || 100);
+        for (const month of data.coveredMonths) {
+          const oblIdx = updatedObligations.findIndex(
+            o => o.memberId === member.id && o.type === 'monthly' && o.periodMonth === month
+          );
+          if (oblIdx >= 0) {
+            const existing = updatedObligations[oblIdx];
+            updatedObligations[oblIdx] = {
+              ...existing,
+              amountPaid: existing.amountDue,
+              status: 'paid',
+            };
+          } else {
+            updatedObligations.push({
+              id: `OBL-M-${member.id}-${month}`,
+              memberId: member.id,
+              type: 'monthly',
+              periodMonth: month,
+              title: `Monthly Fee - ${month}`,
+              amountDue: perMonth,
+              amountPaid: perMonth,
+              status: 'paid',
+              createdAt: now,
+            });
+          }
+        }
+      }
+
+      return {
+        ...prev,
+        obligations: updatedObligations,
+        payments: [newPayment, ...prev.payments],
+        auditLogs: [audit, ...prev.auditLogs],
+      };
+    });
 
     setLatestReceipt(newPayment);
     return newPayment;
-  }, [state.members, state.payments.length, state.settings.receiptPrefix, isAdmin]);
+  }, [state.members, state.payments.length, state.settings.receiptPrefix, state.settings.monthlyFee, isAdmin]);
 
   const updatePayment = useCallback((id: string, updates: Partial<PaymentRecord>) => {
     setState(prev => {
@@ -608,10 +669,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setState(prev => {
       const pay = prev.payments.find(p => p.id === id);
       const updatedPayments = prev.payments.filter(p => p.id !== id);
+      let updatedObligations = [...prev.obligations];
+
+      // If deleted payment covered obligations, revert their paid amounts
+      if (pay && pay.allocations && pay.allocations.length > 0) {
+        for (const alloc of pay.allocations) {
+          if (alloc.periodMonth && (alloc.type === 'monthly' || pay.paymentCategory === 'annual_monthly')) {
+            const oblIdx = updatedObligations.findIndex(
+              o => o.memberId === pay.memberId && o.type === 'monthly' && o.periodMonth === alloc.periodMonth
+            );
+            if (oblIdx >= 0) {
+              const obl = updatedObligations[oblIdx];
+              const newPaid = Math.max(0, obl.amountPaid - alloc.amount);
+              updatedObligations[oblIdx] = {
+                ...obl,
+                amountPaid: newPaid,
+                status: newPaid <= 0 ? 'unpaid' : newPaid >= obl.amountDue ? 'paid' : 'partial',
+              };
+            }
+          }
+        }
+      }
+
       const audit = addAuditLog('DELETE_PAYMENT', `Deleted payment #${pay?.receiptNumber || id} (Rs. ${pay?.amountReceived})`, 'Payment', id);
       return {
         ...prev,
         payments: updatedPayments,
+        obligations: updatedObligations,
         auditLogs: [audit, ...prev.auditLogs],
       };
     });
@@ -1065,7 +1149,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 10. BACKUP & RESTORE
   const exportBackupJson = useCallback(() => {
     const backupData = {
-      app: 'Anjuman Falah-o-Bahbood Chamhatti Wa Khalabat Butt Karachi',
+      app: 'Anjuman Falah-o-Bahbood Chamhatti Khala Butt Karachi',
       exportedAt: new Date().toISOString(),
       version: '2.0',
       database: state,

@@ -204,7 +204,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
                   ? 'ایڈمنسٹریٹر کا محفوظ پاس ورڈ سیٹ کریں'
                   : mode === 'recover'
                   ? 'پاس ورڈ کی تصدیق و بحالی'
-                  : 'انجمن فلاح و بہبود چمہٹی و کھلابٹ بٹ کراچی'}
+                  : 'انجمن فلاح و بہبود چمہٹی کھلابٹ کراچی'}
               </p>
             </div>
           </div>

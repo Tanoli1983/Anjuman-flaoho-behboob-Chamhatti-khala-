@@ -32,6 +32,8 @@ export interface OfficeBearer {
 export interface OrganizationSettings {
   orgName: string;
   orgNameUrdu: string;
+  registrationNumber?: string;
+  registrationNumberUrdu?: string;
   tagline: string;
   address: string;
   phone: string;
@@ -104,7 +106,7 @@ export interface EmergencyEvent {
 }
 
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'easypaisa' | 'jazzcash' | 'other';
-export type PaymentCategory = 'monthly' | 'emergency' | 'registration' | 'annual_emergency' | 'donation' | 'other';
+export type PaymentCategory = 'monthly' | 'emergency' | 'registration' | 'annual_emergency' | 'annual_monthly' | 'donation' | 'other';
 
 export interface PaymentAllocation {
   obligationId?: string;
@@ -229,6 +231,7 @@ export interface AccountingSummary {
   openingBalance: number;
   totalRegistrationFees: number;
   totalMonthlyFees: number;
+  totalAnnualMonthlyFees: number;
   totalEmergencyFees: number;
   totalDonationsAndOtherIncome: number;
   totalIncomeCollected: number;

@@ -23,6 +23,7 @@ import { Announcements } from './components/Announcements';
 import { ReceiptModal } from './components/ReceiptModal';
 import { AccountingTestsModal } from './components/AccountingTestsModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 const MainLayout: React.FC = () => {
   const { activeTab, setActiveTab, latestReceipt, setLatestReceipt, language } = useApp();
@@ -137,6 +138,9 @@ const MainLayout: React.FC = () => {
         isOpen={isAdminLoginOpen}
         onClose={() => setIsAdminLoginOpen(false)}
       />
+
+      {/* PWA Offline Network Toast */}
+      <OfflineIndicator />
     </div>
   );
 };

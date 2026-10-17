@@ -428,7 +428,7 @@ export const OfficeBearers: React.FC = () => {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Address (Karachi / Haripur)
+                  Address (Karachi / Chamhatti Khala Butt)
                 </label>
                 <input
                   type="text"

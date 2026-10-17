@@ -12,6 +12,7 @@ import {
   Calendar,
   CheckCircle2,
   FileSpreadsheet,
+  FileDown,
 } from 'lucide-react';
 
 interface MemberLedgerProps {
@@ -69,24 +70,53 @@ export const MemberLedger: React.FC<MemberLedgerProps> = ({
       (p) => p.memberId === selectedMember.id && p.status !== 'reversed'
     );
     for (const pay of memberPayments) {
-      // Check if payment covers the filtered type
-      const relevantAllocations =
-        filterType === 'all'
-          ? pay.allocations
-          : pay.allocations.filter((a) => a.type === filterType);
+      if (pay.allocations && pay.allocations.length > 0) {
+        const relevantAllocations =
+          filterType === 'all'
+            ? pay.allocations
+            : pay.allocations.filter(
+                (a) =>
+                  a.type === filterType ||
+                  (filterType === 'monthly' &&
+                    (pay.paymentCategory === 'monthly' || pay.paymentCategory === 'annual_monthly'))
+              );
 
-      if (relevantAllocations.length > 0) {
-        const creditSum = relevantAllocations.reduce((sum, a) => sum + a.amount, 0);
-        entries.push({
-          id: pay.id,
-          date: pay.date,
-          type: 'payment',
-          title: `Payment Received (${pay.allocations.map((a) => a.title).join(', ')})`,
-          debit: 0,
-          credit: creditSum,
-          refNo: pay.receiptNumber,
-          paymentRecord: pay,
-        });
+        if (relevantAllocations.length > 0) {
+          const creditSum = relevantAllocations.reduce((sum, a) => sum + a.amount, 0);
+          const isAnnual = pay.paymentCategory === 'annual_monthly';
+          entries.push({
+            id: pay.id,
+            date: pay.date,
+            type: 'payment',
+            title: isAnnual
+              ? `Annual Monthly Fee (${pay.relevantPeriod || pay.allocations.length + ' months'})`
+              : `Payment Received (${pay.allocations.map((a) => a.title).join(', ')})`,
+            debit: 0,
+            credit: creditSum,
+            refNo: pay.receiptNumber,
+            paymentRecord: pay,
+          });
+        }
+      } else {
+        if (
+          filterType === 'all' ||
+          filterType === pay.paymentCategory ||
+          (filterType === 'monthly' && pay.paymentCategory === 'annual_monthly')
+        ) {
+          entries.push({
+            id: pay.id,
+            date: pay.date,
+            type: 'payment',
+            title:
+              pay.paymentCategory === 'annual_monthly'
+                ? `Annual Monthly Fee (${pay.relevantPeriod || '-'})`
+                : `Payment Received (${pay.paymentCategory.toUpperCase()})`,
+            debit: 0,
+            credit: pay.amountReceived,
+            refNo: pay.receiptNumber,
+            paymentRecord: pay,
+          });
+        }
       }
     }
 
@@ -197,7 +227,10 @@ export const MemberLedger: React.FC<MemberLedgerProps> = ({
               <h3 className="text-base font-bold text-emerald-800 font-urdu mt-0.5">
                 {state.settings.orgNameUrdu}
               </h3>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs font-semibold text-emerald-900 mt-1">
+                Registered Number: K/2018 DSW(4347) • رجسٹریشن نمبر: K/2018 DSW(4347)
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
                 Official Member Account Statement • کھاتہ ممبر
               </p>
             </div>
@@ -353,10 +386,10 @@ export const MemberLedger: React.FC<MemberLedgerProps> = ({
                       {entry.paymentRecord && (
                         <button
                           onClick={() => setLatestReceipt(entry.paymentRecord)}
-                          title="View Receipt"
-                          className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded transition cursor-pointer"
+                          title="Payment Receipt PDF (View & Download)"
+                          className="p-1 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-100/70 rounded transition cursor-pointer"
                         >
-                          <ReceiptText className="w-4 h-4 inline" />
+                          <FileDown className="w-4 h-4 inline" />
                         </button>
                       )}
                     </td>
@@ -394,7 +427,7 @@ export const MemberLedger: React.FC<MemberLedgerProps> = ({
               <div className="border-t border-slate-400 pt-1 font-semibold text-slate-800">
                 General Secretary / صدر
               </div>
-              <p className="text-[10px] text-slate-400">Anjuman Falah-o-Behbood Chamhatti</p>
+              <p className="text-[10px] text-slate-400">Anjuman Falah-o-Bahbood Chamhatti Khala Butt Karachi</p>
             </div>
           </div>
         </div>

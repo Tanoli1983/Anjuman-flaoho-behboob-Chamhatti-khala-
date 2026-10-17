@@ -1,10 +1,12 @@
 import { AppState, Member, FeeObligation, EmergencyEvent, PaymentRecord, ExpenseRecord, IncomeRecord, Announcement, OfficeBearer } from '../types';
 
 export const initialSettings = {
-  orgName: 'Anjuman Falah-o-Bahbood Chamhatti Wa Khalabat Butt Karachi',
-  orgNameUrdu: 'انجمن فلاح و بہبود چھمھٹی و خالصہ بٹ کراچی',
-  tagline: 'Serving Chamhatti & Khalabat Community in Karachi & Native Village through Welfare, Relief & Support',
-  address: 'Central Office Karachi / Native Village Haripur, KPK',
+  orgName: 'Anjuman Falah-o-Bahbood Chamhatti Khala Butt Karachi',
+  orgNameUrdu: 'انجمن فلاح و بہبود چمہٹی کھلابٹ کراچی',
+  registrationNumber: 'Registered Number: K/2018 DSW(4347)',
+  registrationNumberUrdu: 'رجسٹریشن نمبر: K/2018 DSW(4347)',
+  tagline: 'Serving Chamhatti & Khala Butt Community in Karachi through Welfare, Relief & Support',
+  address: 'Central Office Karachi, Pakistan',
   phone: '+92 300 5551234',
   financialYear: '2026-2027',
   monthlyFee: 100, // Monthly Membership Fee: Rs. 100

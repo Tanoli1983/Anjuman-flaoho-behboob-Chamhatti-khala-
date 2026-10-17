@@ -1,14 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="ur" dir="auto">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Anjuman Falah-o-Behbood Chamhatti Khala Butt Management System</title>
-    <meta name="description" content="Comprehensive association management and accounting system for Anjuman Falah-o-Behbood Chamhatti Khala Butt with member ledgers, monthly fees, emergency death welfare funds, and financial reports." />
-    <meta property="og:title" content="Anjuman Falah-o-Behbood Chamhatti Khala Butt Management System" />
-    <meta property="og:description" content="Comprehensive association management and accounting system for Anjuman Falah-o-Behbood Chamhatti Khala Butt with member ledgers, monthly fees, emergency death welfare funds, and financial reports." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Anjuman Falah-o-Bahbood Chamhatti Khalabut Karachi</title>
+    <meta name="description" content="Anjuman Falah-o-Bahbood Chamhatti Khalabut Karachi (انجمن فلاح و بہبود چمہٹی کھلابٹ کراچی) - Registered Number: K/2018 DSW(4347) - Comprehensive association management and accounting system with member ledgers, monthly fees, emergency death welfare funds, and financial reports." />
+    
+    <!-- PWA Primary & Mobile Capabilities -->
+    <meta name="theme-color" content="#065f46" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Anjuman" />
+    <meta name="application-name" content="Anjuman" />
+    
+    <!-- PWA Web App Manifest -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    <!-- Open Graph / Social Sharing -->
+    <meta property="og:title" content="Anjuman Falah-o-Bahbood Chamhatti Khalabut Karachi" />
+    <meta property="og:description" content="انجمن فلاح و بہبود چمہٹی کھلابٹ کراچی - Registered Number: K/2018 DSW(4347) - Comprehensive association management and accounting system." />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="/pwa-512x512.png" />
     <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,6 +39,15 @@
   <body class="bg-slate-50 text-slate-900 antialiased font-sans">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Register service worker if supported
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {
+            // Service worker fallback handling
+          });
+        });
+      }
+    </script>
   </body>
 </html>
-
